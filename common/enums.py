@@ -1,4 +1,4 @@
-from enum import IntEnum
+from enum import IntEnum, Enum
 
 # Tipos de tiles (blocos do cenário).
 class TileType(IntEnum):
