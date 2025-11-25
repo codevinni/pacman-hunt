@@ -1,11 +1,10 @@
-from enums import TileType, ItemType, EntityType
+from enums import TileType, ItemType
 
 # Representa 1 célula do labirinto.
 class Cell:
-    def __init__(self, tile, item=None, entity=None):
-        self.tile = tile
-        self.item = item
-        self.entity = entity
+    def __init__(self, tile, item=None):
+        self.tile = tile     # TileType.EMPTY ou TileType.WALL.
+        self.item = item     # ItemType.PAC_DOT, POWER_PELLET ou None.
 
     def is_wall(self):
         """
@@ -23,7 +22,7 @@ class Cell:
         """
             Retorna True se não tiver item ou entidade na determinada célula.
         """
-        return self.item is None and self.entity is None or self.item == TileType.EMPTY
+        return self.item is None or self.item == TileType.EMPTY
 
     def has_pac_dot(self):
         """
@@ -44,15 +43,4 @@ class Cell:
         item = self.item
         self.item = None
         return item
-    
-    def set_entity(self, entity):
-        """
-            Insere uma entidade na célula (Pac-Man ou Fantasma).
-        """
-        self.entity = entity
 
-    def remove_entity(self):
-        """
-            Remove qualquer entidade da célula.
-        """
-        self.entity = None
