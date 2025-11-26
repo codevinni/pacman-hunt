@@ -1,5 +1,5 @@
-from enums import TileType, ItemType, EntityType
-from cell import Cell
+from .enums import TileType, ItemType, EntityType
+from .cell import Cell
 
 # Representação e manipulação do labirinto.
 class Matrix:

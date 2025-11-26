@@ -1,9 +1,10 @@
 import json
 import pickle
 import struct
-from client_connection import ClientSocket
+
+from .client_connection import ClientSocket
+from ..exceptions import GameNetworkError, SerializationError
 from common.enums import PlayerAction
-from exceptions import GameNetworkError, SerializationError
 from common.matrix import Matrix
 
 class NetworkManager:

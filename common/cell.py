@@ -1,4 +1,4 @@
-from enums import TileType, ItemType
+from .enums import TileType, ItemType
 
 # Representa 1 célula do labirinto.
 class Cell:
