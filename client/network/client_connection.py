@@ -9,11 +9,13 @@ class ClientSocket:
     Attributes:
         ip (str): O endereço IP do servidor de destino.
         port (int): A porta TCP do servidor de destino.
+        timeout (float): Limite de tempo para timeout.
     """
 
-    def __init__(self, server_ip:str, server_port:int):
+    def __init__(self, server_ip:str, server_port:int, timeout: float = None):
         self.ip = server_ip
         self.port = server_port
+        self.timeout= timeout
         self.sock = None
 
     def __enter__(self):
@@ -36,6 +38,7 @@ class ClientSocket:
 
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            if self.timeout: self.sock.settimeout(self.timeout)
             self.sock.connect((self.ip, self.port))
         except socket.error as e:
             raise ConnectionError(f"Error while connecting: {e}")
@@ -59,9 +62,11 @@ class ClientSocket:
         except Exception as e:
             raise RuntimeError(f"Error while sending data: {e}")
 
-    def receive(self) -> bytes:
-        """ Recebe dados do servidor. Lê até 1024 bytes do buffer do socket.
-
+    def receive(self, num_bytes:int) -> bytes:
+        """ Recebe dados do servidor. Lê até N bytes do buffer do socket.
+        Args:
+            num_bytes (int): Números de bytes a serem lidos.
+        
         Returns:
             bytes: Os dados recebidos do servidor.
 
@@ -69,13 +74,23 @@ class ClientSocket:
             ConnectionError: Se o socket não estiver conectado.
             RuntimeError: Se ocorrer um erro durante o recebimento.
         """
+        data = b""
 
         if not self.sock:
             raise ConnectionError("Not connected.")
 
         try:
-            data = self.sock.recv(1024)
+
+            while len(data) < num_bytes:
+                packet = self.sock.recv(num_bytes - len(data))
+
+                if not packet:
+                    return None
+                
+                data += packet
+
             return data
+        
         except Exception as e:
             raise RuntimeError(f"Error while receiving data: {e}")
 
