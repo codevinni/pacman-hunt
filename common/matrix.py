@@ -7,14 +7,31 @@ class Matrix:
         self.matrix = self.create_matrix()
         self.entities = {}  # {EntityType: (x, y)}
 
+        # Posiciona entidades iniciais automaticamente: busca os primeiros dois espaços
+        # caminháveis não ocupados por itens e coloca Pac-Man e Blinky neles.
+        placed = 0
+        for y, row in enumerate(self.matrix):
+            for x, cell in enumerate(row):
+                if cell.is_walkable() and not cell.has_pac_dot() and not cell.has_power_pellet():
+                    if placed == 0:
+                        self.entities[EntityType.PACMAN] = (x, y)
+                        placed += 1
+                    elif placed == 1:
+                        self.entities[EntityType.BLINKY] = (x, y)
+                        placed += 1
+                    if placed >= 2:
+                        break
+            if placed >= 2:
+                break
+
     def create_matrix(self):
         """
             Retorna a representação inicial da matriz (labirinto) usando objetos Cell.
         """
         W = Cell(TileType.WALL)
         E = lambda item=None: Cell(TileType.EMPTY, item)
-        D = ItemType.PAC_DOT
-        P = ItemType.POWER_PELLET
+        D = ItemType.PAC_DOTS
+        P = ItemType.POWER_PELLETS
         
         return [
             [W, W, W, W, W, W, W, W, W, W],
@@ -27,33 +44,6 @@ class Matrix:
             [W, E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), W],
             [W, W, W, W, W, W, W, W, W, W]
         ]
-        # return [
-        #     # y = 0
-        #     [Cell(TileType.WALL), Cell(TileType.WALL), Cell(TileType.WALL), Cell(TileType.WALL), Cell(TileType.WALL), Cell(TileType.WALL), Cell(TileType.WALL), Cell(TileType.WALL)],
-
-        #     # y = 1
-        #     [Cell(TileType.WALL), Cell(TileType.EMPTY, ItemType.PAC_DOTS), Cell(TileType.EMPTY, ItemType.PAC_DOTS), Cell(TileType.EMPTY, ItemType.PAC_DOTS), 
-        #      Cell(TileType.EMPTY, ItemType.POWER_PELLETS), Cell(TileType.EMPTY, ItemType.PAC_DOTS), Cell(TileType.EMPTY, ItemType.PAC_DOTS), Cell(TileType.WALL)],
-
-        #     # y = 2
-        #     [Cell(TileType.WALL), Cell(TileType.EMPTY, ItemType.PAC_DOTS), Cell(TileType.WALL), Cell(TileType.WALL), Cell(TileType.WALL), Cell(TileType.WALL), 
-        #      Cell(TileType.EMPTY, ItemType.PAC_DOTS), Cell(TileType.WALL)],
-
-        #     # y = 3
-        #     [Cell(TileType.WALL), Cell(TileType.EMPTY, ItemType.PAC_DOTS), Cell(TileType.EMPTY, ItemType.PAC_DOTS), Cell(TileType.EMPTY, entity=EntityType.PACMAN), 
-        #      Cell(TileType.EMPTY, ItemType.PAC_DOTS), Cell(TileType.EMPTY, ItemType.PAC_DOTS), Cell(TileType.EMPTY, ItemType.PAC_DOTS), Cell(TileType.WALL)],
-
-        #     # y = 4
-        #     [Cell(TileType.WALL), Cell(TileType.EMPTY, ItemType.PAC_DOTS), Cell(TileType.WALL), Cell(TileType.WALL), Cell(TileType.WALL), Cell(TileType.WALL),
-        #      Cell(TileType.EMPTY, ItemType.PAC_DOTS), Cell(TileType.WALL)],
-
-        #     # y = 5
-        #     [Cell(TileType.WALL), Cell(TileType.EMPTY, ItemType.PAC_DOTS), Cell(TileType.EMPTY, ItemType.PAC_DOTS), Cell(TileType.EMPTY, ItemType.PAC_DOTS),
-        #      Cell(TileType.EMPTY, ItemType.PAC_DOTS), Cell(TileType.EMPTY, ItemType.POWER_PELLETS), Cell(TileType.EMPTY, entity=EntityType.BLINKY), Cell(TileType.WALL)],
-
-        #     # y = 6
-        #     [Cell(TileType.WALL), Cell(TileType.WALL), Cell(TileType.WALL), Cell(TileType.WALL), Cell(TileType.WALL), Cell(TileType.WALL), Cell(TileType.WALL), Cell(TileType.WALL)]
-        # ]
 
     def width(self):
         return len(self.matrix[0])
@@ -82,33 +72,31 @@ class Matrix:
         """
         return self.entities.get(entity_type)
     
+    def find_ghost(self, entity):
+        # Compat: procura na tabela de entidades
+        return self.entities.get(entity)
+    
     def move_entity(self, entity, dx, dy):
-        """
-            Move a entidade (Pac-Man ou Fantasma) na direção indicada, se possível.
-        """
-        pass
+        pos = self.entities.get(entity)
+        if pos is None:
+            return
 
-    # Teste 
-    def draw(self, surface, tile_size):
-        for y, row in enumerate(self.matrix):
-            for x, cell in enumerate(row):
-                px = x * tile_size
-                py = y * tile_size
+        x, y = pos
+        nx, ny = x + dx, y + dy
 
-                # Desenha parede.
-                if cell.tile == TileType.WALL:
-                    pygame.draw.rect(surface, WALL_COLOR, (px, py, tile_size, tile_size))
+        # Fora dos limites
+        if nx < 0 or ny < 0 or nx >= self.width() or ny >= self.height():
+            return
 
-                # Desenha pac-dots.
-                if cell.item == ItemType.PAC_DOTS:
-                    pygame.draw.circle(surface, DOT_COLOR, (px + tile_size//2, py + tile_size//2), tile_size//10)
+        target = self.matrix[ny][nx]
 
-                if cell.item == ItemType.POWER_PELLETS:
-                    pygame.draw.circle(surface, PELLET_COLOR, (px + tile_size//2, py + tile_size//2), tile_size//4)
+        # Parede
+        if target.tile == TileType.WALL:
+            return
 
-                # Desenha entidades.
-                if cell.entity == EntityType.PACMAN:
-                    pygame.draw.circle(surface, YELLOW, (px + tile_size//2, py + tile_size//2), tile_size//2)
+        # Consumir item se houver
+        if target.item is not None:
+            target.consume_item()
 
-                if cell.entity == EntityType.BLINKY:
-                    pygame.draw.rect(surface, RED, (px, py, tile_size, tile_size))
+        # Atualiza posição
+        self.entities[entity] = (nx, ny)
