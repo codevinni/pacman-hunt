@@ -1,5 +1,5 @@
 import heapq
-from .enums import EntityType
+from common.enums import EntityType
 
    # -----------------------------------------------------------
    # A SER IMPLEMENTADO:

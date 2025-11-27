@@ -2,9 +2,9 @@ import pygame
 import os
 from common.matrix import Matrix
 from common.enums import EntityType
-from common.config import *
-from common.pacman import PacmanIA
-from common.buffer import *
+from .game.config import *
+from .game.pacman import PacmanIA
+from .game.buffer import *
 
 
 # Função para carregar uma imagem e verificar sua existência
