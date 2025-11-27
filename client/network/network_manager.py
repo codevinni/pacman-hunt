@@ -1,3 +1,4 @@
+import os
 import json
 import pickle
 import struct
@@ -9,7 +10,7 @@ from common.matrix import Matrix
 
 class NetworkManager:
 
-    __SETTINGS_FILE = "../settings.json"
+    __SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'settings.json')
 
     def __init__(self):
 
