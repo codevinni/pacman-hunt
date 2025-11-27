@@ -3,6 +3,9 @@ import os
 from common.matrix import Matrix
 from common.enums import EntityType
 from common.config import *
+from common.pacman import PacmanIA
+from common.buffer import *
+
 
 # Função para carregar uma imagem e verificar sua existência
 def load_image(path):
@@ -74,35 +77,12 @@ def draw_entity(surface, matrix, entity_type, image, tile_size):
 # Função para mover o Blinky
 def move_blinky(matrix, dx, dy):
     matrix.move_entity(EntityType.BLINKY, dx, dy)
-    
-# Função para lidar com a movimentação das entidades
-def handle_movement(event, image, dx, dy):
-    """
-    Lida com a movimentação da entidade (Blinky ou qualquer outro) 
-    baseado na tecla pressionada.
-    Retorna a imagem possivelmente modificada e as novas direções (dx, dy).
-    """
-    if event.type == pygame.KEYDOWN:
-        if event.key == pygame.K_UP:
-            image = pygame.transform.rotate(image, 0)  # Não rotaciona a imagem para cima
-            dx, dy = (0, -1)
-        elif event.key == pygame.K_DOWN:
-            image = pygame.transform.rotate(image, 0)  # Não rotaciona a imagem para baixo
-            dx, dy = (0, 1)
-        elif event.key == pygame.K_LEFT:
-            image = pygame.transform.flip(image, True, False)  # Inverte horizontalmente para esquerda
-            dx, dy = (-1, 0)
-        elif event.key == pygame.K_RIGHT:
-            image = pygame.transform.rotate(image, 0)  # Não rotaciona a imagem para direita
-            dx, dy = (1, 0)
-    return image, dx, dy
-
-
-    
 
 def main():
     pygame.init()
     matrix = Matrix()
+    pacman_ia = PacmanIA()  # Inicializa a IA do Pac-Man
+    blinky_buffer = MovementBuffer(interval=180)  # Buffer de movimento do Blinky
 
     # -----------------------------
     # DETECTA TAMANHO DO MONITOR
@@ -137,18 +117,23 @@ def main():
     running = True
     
     # Controle do tempo para alternar entre as imagens do Pac-Man
-    last_switch_time = pygame.time.get_ticks()  # Em milissegundos
-    pacman_image = pacman_open  # Começa com Pac-Man aberto
-    switch_interval = 250  # Intervalo de 1 segundo para alternar
+    last_switch_time = pygame.time.get_ticks()
+    pacman_image = pacman_open
+    switch_interval = 250
+    
+    # Velocidade do movimento do pacman
+    last_ia_move = pygame.time.get_ticks()
+    move_interval = 180
     
     imagem_rotacionada = pygame.transform.rotate(blinky_img, 0)
+    
     # -----------------------------
     # LOOP PRINCIPAL DO JOGO
     # -----------------------------
     while running:
         clock.tick(60)
 
-        dx = dy = 0  # Só move quando tecla é pressionada
+        dx = dy = 0
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -169,9 +154,18 @@ def main():
                     imagem_rotacionada = pygame.transform.rotate(blinky_img, 0)
                     dx, dy = (1, 0)
 
-        # Mover fantasma (jogador controla)
+        # Adiciona movimento ao buffer do Blinky
         if dx != 0 or dy != 0:
-            move_blinky(matrix, dx, dy)
+            blinky_buffer.queue_move(dx, dy)
+        
+        # Tenta executar movimento do buffer
+        blinky_buffer.try_execute(matrix, EntityType.BLINKY)
+
+        # IA do Pac-Man se move periodicamente
+        current_time = pygame.time.get_ticks()
+        if current_time - last_ia_move >= move_interval:
+            pacman_ia.update(matrix)
+            last_ia_move = current_time
 
         # Verifica se é hora de alternar a imagem do Pac-Man
         pacman_image, last_switch_time = switch_pacman_image(
