@@ -89,6 +89,14 @@ class ServerSocket:
 
         return assigned_ghost
 
+    def __map_sending(self, client_socket):
+
+        COOLDOWN = 0.05
+
+        while True:
+            self.send_matrix(client_socket)
+            time.sleep(COOLDOWN)
+
     def handle_client(self, client_socket):
         """
             Lida com a comunicação de um cliente conectado.
@@ -103,24 +111,25 @@ class ServerSocket:
             self.remove_client(client_socket)
             return
         
+        # 2. Cria outra thread para enviar o mapa constantemente
+        map_sender = threading.Thread(target=self.__map_sending, args=(client_socket,))
+        map_sender.start()
+
         # Loop de controle de movimento e envio de estado
         while True:
             try:
-                # 2. Receber a entrada do cliente (movimentação)
+                # 3. Receber a entrada do cliente (movimentação)
                 client_input_data: PlayerAction = self.receive_data(client_socket)
 
                 if assigned_ghost and client_input_data:
                     # Se o cliente é um jogador e enviou uma ação
                     print(f"Fantasma {assigned_ghost.name} recebeu ação: {client_input_data.name}")
 
-                    # 3. Processar a movimentação
+                    # 4. Processar a movimentação
                     # TODO: Implementar a lógica de movimento na matriz usando client_input_data
                     # Exemplo (necessita que Matrix.move_entity receba PlayerAction ou Direction):
                     # with self.lock:
                     #     self.matrix.move_entity(assigned_ghost, client_input_data)
-
-                # 4. Enviar a matriz atualizada (estado do jogo)
-                self.send_matrix(client_socket)
 
                 # Pausa para controle de taxa de atualização
                 time.sleep(0.05)
