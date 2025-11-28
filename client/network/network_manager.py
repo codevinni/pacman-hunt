@@ -5,7 +5,7 @@ import struct
 
 from .client_connection import ClientSocket
 from ..exceptions import GameNetworkError, SerializationError
-from common.enums import PlayerAction
+from common.enums import PlayerAction, EntityType
 from common.matrix import Matrix
 
 class NetworkManager:
@@ -62,17 +62,43 @@ class NetworkManager:
         except (pickle.PicklingError, struct.error) as e:
             raise SerializationError(f"Falha ao serializar input: {e}")
 
-    def get_game_state(self) -> Matrix | None:
-        """ Obtém o estado atual do jogo através da matriz enviada pelo servidor.
+    def get_my_ghost(self) -> EntityType | None:
+        """ Obtém do servidor o fantasma que foi atribuido para o cliente.
 
         Returns:
-            Matrix | None: A matriz do jogo se recebida com sucesso, None caso contrário.
+            EntityType: O tipo de entidade, None caso contrário.
 
         Raises:
             GameNetworkError: Se houver algum erro na conexão. 
             SerializationError: Se os dados recebidos estiverem incompletos ou corrompidos.
         """
+        ghost = self.__get_response()
+        return ghost
+       
+    def get_game_state(self) -> Matrix | None:
+        """ Obtém o estado atual do jogo através da matriz enviada pelo servidor.
 
+        Returns:
+            Matrix: A matriz do jogo se recebida com sucesso, None caso contrário.
+
+        Raises:
+            GameNetworkError: Se houver algum erro na conexão. 
+            SerializationError: Se os dados recebidos estiverem incompletos ou corrompidos.
+        """
+        matrix = self.__get_response()
+        return matrix
+        
+        
+    def __get_response(self):
+        """ Obtém um objeto serializado enviado pelo servidor.
+
+        Returns:
+            Any: Um objeto, se recebido com sucesso, None caso contrário.
+
+        Raises:
+            GameNetworkError: Se houver algum erro na conexão. 
+            SerializationError: Se os dados recebidos estiverem incompletos ou corrompidos.
+        """
         HEADER_SIZE = 4
 
         try:
@@ -82,14 +108,14 @@ class NetworkManager:
                 return None
 
             size = struct.unpack(">I", header)[0]
-            matrix_data = self.conn.receive(size)
+            serialized_data = self.conn.receive(size)
 
-            if not matrix_data:
-                raise RuntimeError("Conteúdo da matriz ayusente")
+            if not serialized_data:
+                raise RuntimeError("Conteúdo do pacote ausente")
             
-            matrix = pickle.loads(matrix_data)
+            data = pickle.loads(serialized_data)
 
-            return matrix
+            return data
             
         except (ConnectionError, RuntimeError) as e:
             raise GameNetworkError(f"Erro de conexão: {e}")
