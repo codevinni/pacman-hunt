@@ -5,24 +5,13 @@ from .cell import Cell
 class Matrix:
     def __init__(self):
         self.matrix = self.create_matrix()
-        self.entities = {}  # {EntityType: (x, y)}
-
-        # Posiciona entidades iniciais automaticamente: busca os primeiros dois espaços
-        # caminháveis não ocupados por itens e coloca Pac-Man e Blinky neles.
-        placed = 0
-        for y, row in enumerate(self.matrix):
-            for x, cell in enumerate(row):
-                if cell.is_walkable() and not cell.has_pac_dot() and not cell.has_power_pellet():
-                    if placed == 0:
-                        self.entities[EntityType.PACMAN] = (x, y)
-                        placed += 1
-                    elif placed == 1:
-                        self.entities[EntityType.BLINKY] = (x, y)
-                        placed += 1
-                    if placed >= 2:
-                        break
-            if placed >= 2:
-                break
+        self.entities = {
+            EntityType.PACMAN: (14,23),
+            EntityType.BLINKY: (12,14),
+            EntityType.INKY: (13,14),
+            EntityType.PINKY: (14,14),
+            EntityType.CLYDE: (15,14)
+        } 
 
     def create_matrix(self):
         """
@@ -33,16 +22,51 @@ class Matrix:
         D = ItemType.PAC_DOTS
         P = ItemType.POWER_PELLETS
         
+        # Mapa 28x31
         return [
-            [W, W, W, W, W, W, W, W, W, W],
-            [W, E(D), E(D), E(D), E(P), E(D), E(D), E(D), E(D), W],
-            [W, E(D), W, W, W, W, W, W, E(D), W],
-            [W, E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), W],
-            [W, E(D), W, W, W, W, W, W, E(D), W],
-            [W, E(D), E(D), E(D), E(D), E(D), E(P), E(D), E(D), W],
-            [W, E(D), W, W, E(), E(), W, W, E(D), W],
-            [W, E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), W],
-            [W, W, W, W, W, W, W, W, W, W]
+
+            [W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W],
+        
+            [W, E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), W, W, E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), W],
+            [W, E(D), W, W, W, W, E(D), W, W, W, W, W, E(D), W, W, E(D), W, W, W, W, W, E(D), W, W, W, W, E(D), W],
+            [W, E(P), W, W, W, W, E(D), W, W, W, W, W, E(D), W, W, E(D), W, W, W, W, W, E(D), W, W, W, W, E(P), W],
+            [W, E(D), W, W, W, W, E(D), W, W, W, W, W, E(D), W, W, E(D), W, W, W, W, W, E(D), W, W, W, W, E(D), W],
+            [W, E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), W],
+            [W, E(D), W, W, W, W, E(D), W, W, E(D), W, W, W, W, W, W, W, W, E(D), W, W, E(D), W, W, W, W, E(D), W],
+            [W, E(D), W, W, W, W, E(D), W, W, E(D), W, W, W, W, W, W, W, W, E(D), W, W, E(D), W, W, W, W, E(D), W],
+            [W, E(D), E(D), E(D), E(D), E(D), E(D), W, W, E(D), E(D), E(D), E(D), W, W, E(D), E(D), E(D), E(D), W, W, E(D), E(D), E(D), E(D), E(D), E(D), W],
+            
+            [W, W, W, W, W, W, E(D), W, W, W, W, W, E(D), W, W, E(D), W, W, W, W, W, E(D), W, W, W, W, W, W],
+            [W, W, W, W, W, W, E(D), W, W, W, W, W, E(D), W, W, E(D), W, W, W, W, W, E(D), W, W, W, W, W, W],
+            [W, W, W, W, W, W, E(D), W, W, E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), W, W, E(D), W, W, W, W, W, W],
+           
+            # Início da área dos ghosts
+            [W, W, W, W, W, W, E(D), W, W, E(D), W, W, W, E(), E(), W, W, W, E(D), W, W, E(D), W, W, W, W, W, W],
+            [W, W, W, W, W, W, E(D), W, W, E(D), W, E(), E(), E(), E(), E(), E(), W, E(D), W, W, E(D), W, W, W, W, W, W],
+            
+            # Túnel (meio do mapa)
+            [E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), W, E(), E(), E(), E(), E(), E(), W, E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D)],
+            
+            # Restante da área dos ghosts
+            [W, W, W, W, W, W, E(D), W, W, E(D), W, E(), E(), E(), E(), E(), E(), W, E(D), W, W, E(D), W, W, W, W, W, W],
+            [W, W, W, W, W, W, E(D), W, W, E(D), W, W, W, W, W, W, W, W, E(D), W, W, E(D), W, W, W, W, W, W],
+            
+            [W, W, W, W, W, W, E(D), W, W, E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), W, W, E(D), W, W, W, W, W, W],
+            [W, W, W, W, W, W, E(D), W, W, E(D), W, W, W, W, W, W, W, W, E(D), W, W, E(D), W, W, W, W, W, W],
+            [W, W, W, W, W, W, E(D), W, W, E(D), W, W, W, W, W, W, W, W, E(D), W, W, E(D), W, W, W, W, W, W],
+            
+            [W, E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), W, W, E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), W],
+            [W, E(D), W, W, W, W, E(D), W, W, W, W, W, E(D), W, W, E(D), W, W, W, W, W, E(D), W, W, W, W, E(D), W],
+            [W, E(D), W, W, W, W, E(D), W, W, W, W, W, E(D), W, W, E(D), W, W, W, W, W, E(D), W, W, W, W, E(D), W],
+            [W, E(P), E(D), E(D), W, W, E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), W, W, E(D), E(D), E(P), W],
+            [W, W, W, E(D), W, W, E(D), W, W, E(D), W, W, W, W, W, W, W, W, E(D), W, W, E(D), W, W, E(D), W, W, W],
+            [W, W, W, E(D), W, W, E(D), W, W, E(D), W, W, W, W, W, W, W, W, E(D), W, W, E(D), W, W, E(D), W, W, W],
+            [W, E(D), E(D), E(D), E(D), E(D), E(D), W, W, E(D), E(D), E(D), E(D), W, W, E(D), E(D), E(D), E(D), W, W, E(D), E(D), E(D), E(D), E(D), E(D), W],
+            [W, E(D), W, W, W, W, W, W, W, W, W, W, E(D), W, W, E(D), W, W, W, W, W, W, W, W, W, W, E(D), W],
+            [W, E(D), W, W, W, W, W, W, W, W, W, W, E(D), W, W, E(D), W, W, W, W, W, W, W, W, W, W, E(D), W],
+            [W, E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), W],
+        
+            [W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W]
         ]
 
     def width(self):
