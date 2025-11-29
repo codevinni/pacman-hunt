@@ -1,11 +1,10 @@
 import pygame
 import os
 from common.matrix import Matrix
-from common.enums import EntityType
+from common.enums import EntityType, PlayerAction
 from .game.config import *
-from .game.pacman import PacmanIA
-from .game.buffer import *
 
+from .network.network_manager import NetworkManager
 
 # Função para carregar uma imagem e verificar sua existência
 def load_image(path):
@@ -81,8 +80,6 @@ def move_blinky(matrix, dx, dy):
 def main():
     pygame.init()
     matrix = Matrix()
-    pacman_ia = PacmanIA()  # Inicializa a IA do Pac-Man
-    blinky_buffer = MovementBuffer(interval=180)  # Buffer de movimento do Blinky
 
     # -----------------------------
     # DETECTA TAMANHO DO MONITOR
@@ -127,50 +124,48 @@ def main():
     
     imagem_rotacionada = pygame.transform.rotate(blinky_img, 0)
     
+    '''
+    OBS: É SOMENTE UM ESBOÇO PARA INTEGRAÇÃO DO CLIENTE AO PYGAME.
+    TRATEM EXCEÇÕES E ERROS, ESTÁ TUDO COMENTADO NA CLASSE
+    '''
+    network_manager = NetworkManager()
+    network_manager.connect_to_server()
+
+    # PARA CARREGAR SPRITES EQUIVALENTES
+    GHOST = network_manager.get_my_ghost()
+
+    # MAPEAMENTO DAS AÇÕES DO PYGAME, PARA AS QUE DEFINIMOS
+    key_actions = {
+            pygame.K_UP: PlayerAction.UP,
+            pygame.K_DOWN: PlayerAction.DOWN,
+            pygame.K_LEFT: PlayerAction.LEFT,
+            pygame.K_RIGHT: PlayerAction.RIGHT
+    }
+
     # -----------------------------
     # LOOP PRINCIPAL DO JOGO
     # -----------------------------
     while running:
-        clock.tick(60)
 
-        dx = dy = 0
+        clock.tick(60)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
 
-            # MOVER APENAS QUANDO TECLA É PRESSIONADA (KEYDOWN)
+            # Enviando input para o servidor.
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP:
-                    imagem_rotacionada = pygame.transform.rotate(blinky_img, 0)
-                    dx, dy = (0, -1)
-                elif event.key == pygame.K_DOWN:
-                    imagem_rotacionada = pygame.transform.rotate(blinky_img, 0)
-                    dx, dy = (0, 1)
-                elif event.key == pygame.K_LEFT:
-                    imagem_rotacionada = pygame.transform.flip(blinky_img, True, False)
-                    dx, dy = (-1, 0)
-                elif event.key == pygame.K_RIGHT:
-                    imagem_rotacionada = pygame.transform.rotate(blinky_img, 0)
-                    dx, dy = (1, 0)
-
-        # Adiciona movimento ao buffer do Blinky
-        if dx != 0 or dy != 0:
-            blinky_buffer.queue_move(dx, dy)
+                if event.key in key_actions:
+                    network_manager.send_input(key_actions[event.key])
         
-        # Tenta executar movimento do buffer
-        blinky_buffer.try_execute(matrix, EntityType.BLINKY)
-
-        # IA do Pac-Man se move periodicamente
-        current_time = pygame.time.get_ticks()
-        if current_time - last_ia_move >= move_interval:
-            pacman_ia.update(matrix)
-            last_ia_move = current_time
 
         # Verifica se é hora de alternar a imagem do Pac-Man
         pacman_image, last_switch_time = switch_pacman_image(
             pacman_image, pacman_open, pacman_close, last_switch_time, switch_interval
         )
+
+        # OBTEM A MATRIZ 
+        matrix = network_manager.get_game_state()
 
         # Renderização
         screen.fill(BLACK)

@@ -6,6 +6,8 @@ import threading
 from common.matrix import Matrix            
 from common.enums import EntityType, PlayerAction 
 
+from ..pacman import PacmanIA
+
 class ServerSocket:
     """
         Define o servidor para conexões de socket TCP/IP.
@@ -16,6 +18,8 @@ class ServerSocket:
         self.timeout = timeout
 
         self.matrix = Matrix()
+        self.pacman_ai = PacmanIA()
+        self.pacman_running = False
 
         self.server_socket = None
         self.clients = {}
@@ -25,8 +29,8 @@ class ServerSocket:
 
         self.available_ghosts = [
             EntityType.BLINKY,
-            EntityType.PINKY,
             EntityType.INKY,
+            EntityType.PINKY,
             EntityType.CLYDE
         ]
     
@@ -89,6 +93,15 @@ class ServerSocket:
 
         return assigned_ghost
 
+    def __move_pacman(self):
+    
+        while self.pacman_running:
+
+            with self.lock:
+                self.pacman_ai.update(self.matrix)
+
+            time.sleep(0.2)
+
     def __map_sending(self, client_socket):
 
         COOLDOWN = 0.05
@@ -115,21 +128,34 @@ class ServerSocket:
         map_sender = threading.Thread(target=self.__map_sending, args=(client_socket,))
         map_sender.start()
 
+        # 3. Cria outra thread para iniciar o PacMan
+        if assigned_ghost and not self.pacman_running:
+            self.pacman_running = True
+            pacman_mover = threading.Thread(target=self.__move_pacman)
+            pacman_mover.start()
+
         # Loop de controle de movimento e envio de estado
         while True:
             try:
-                # 3. Receber a entrada do cliente (movimentação)
+                # 4. Receber a entrada do cliente (movimentação)
                 client_input_data: PlayerAction = self.receive_data(client_socket)
 
                 if assigned_ghost and client_input_data:
                     # Se o cliente é um jogador e enviou uma ação
                     print(f"Fantasma {assigned_ghost.name} recebeu ação: {client_input_data.name}")
 
-                    # 4. Processar a movimentação
-                    # TODO: Implementar a lógica de movimento na matriz usando client_input_data
-                    # Exemplo (necessita que Matrix.move_entity receba PlayerAction ou Direction):
-                    # with self.lock:
-                    #     self.matrix.move_entity(assigned_ghost, client_input_data)
+                    movement_map = {
+                        PlayerAction.UP: (0, -1),
+                        PlayerAction.RIGHT: (1, 0),
+                        PlayerAction.DOWN: (0, 1),
+                        PlayerAction.LEFT: (-1,0),
+                    }
+
+                    delta_x, delta_y = movement_map[client_input_data]
+
+                    # Movimenta o fantasminha baseando no input
+                    with self.lock:
+                        self.matrix.move_entity(assigned_ghost, delta_x, delta_y)
 
                 # Pausa para controle de taxa de atualização
                 time.sleep(0.05)
@@ -223,3 +249,6 @@ class ServerSocket:
 
                 client_socket.close()
                 print("Cliente removido e fantasma liberado (se aplicável).")
+
+                if len(self.available_ghosts) == 4:
+                    self.pacman_running = False
