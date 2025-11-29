@@ -4,6 +4,8 @@ from enum import IntEnum, Enum, auto
 class TileType(IntEnum):
     EMPTY = 0
     WALL = 1
+    DOOR = 2        # Porta da área do fantasma
+    TUNNEL = 3      # Passagem lateral do mapa
 
 # Entidades vivas no jogo (Pac-Man e Fantasmas).
 class EntityType(IntEnum):
@@ -15,8 +17,8 @@ class EntityType(IntEnum):
 
 # Itens coletáveis.
 class ItemType(IntEnum):
-    PAC_DOTS = 10
-    POWER_PELLETS = 11
+    PAC_DOT = 10
+    POWER_PELLET = 11
 
 # Ações (inputs) do jogador.
 class PlayerAction(Enum):
@@ -24,3 +26,4 @@ class PlayerAction(Enum):
     DOWN = auto()
     LEFT = auto()
     RIGHT = auto()
+    

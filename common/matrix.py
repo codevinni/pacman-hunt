@@ -19,8 +19,8 @@ class Matrix:
         """
         W = Cell(TileType.WALL)
         E = lambda item=None: Cell(TileType.EMPTY, item)
-        D = ItemType.PAC_DOTS
-        P = ItemType.POWER_PELLETS
+        D = ItemType.PAC_DOT
+        P = ItemType.POWER_PELLET
         
         # Mapa 28x31
         return [
@@ -101,26 +101,41 @@ class Matrix:
         return self.entities.get(entity)
     
     def move_entity(self, entity, dx, dy):
-        pos = self.entities.get(entity)
-        if pos is None:
-            return
+        """
+        Move uma entidade no labirinto.
 
-        x, y = pos
+        - Apenas Pac-Man coleta PAC-DOTS e POWER-PELLETS.
+        - Entidades apenas se movem se o destino for válido.
+        """
+
+        position = self.entities.get(entity)
+        if position is None:
+            return None  # Entidade inexistente
+
+        x, y = position
+
+        # dx deslocamento no eixo X 
+        # dy deslocamento no eixo Y 
+        # nx novo X (posição futura)	
+        # ny novo Y (posição futura)	
         nx, ny = x + dx, y + dy
 
-        # Fora dos limites
-        if nx < 0 or ny < 0 or nx >= self.width() or ny >= self.height():
-            return
+        # Verifica limites
+        if not (0 <= nx < self.width() and 0 <= ny < self.height()):
+            return None  # Movimento inválido
 
-        target = self.matrix[ny][nx]
+        cell = self.matrix[ny][nx]
 
-        # Parede
-        if target.tile == TileType.WALL:
-            return
+        # Bloqueia movimento caso seja parede
+        if cell.tile == TileType.WALL:
+            return None
 
-        # Consumir item se houver
-        if target.item is not None:
-            target.consume_item()
+        # Se for Pac-Man, permite consumir itens
+        collected = None
+        if entity == EntityType.PACMAN and cell.item is not None:
+            collected = cell.consume_item()
 
-        # Atualiza posição
+        # Atualiza posição da entidade
         self.entities[entity] = (nx, ny)
+        return collected  # Retorna item coletado ou None
+    
