@@ -3,9 +3,19 @@ import json
 from .server_connection import ServerSocket
 
 class ServerManager:
+    """
+        Gerencia a configuração e inicialização do servidor de jogo.
+
+        Responsável por carregar as configurações do arquivo 'settings.json' e iniciar a instância do ServerSocket.
+    """
     __SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'settings.json')
 
     def __init__(self):
+        """
+            Inicializa o ServerManager.
+
+            Carrega as configurações de IP, porta e timeout e cria a instância de ServerSocket.
+        """
         settings = self.__load_settings()
         self.ip = settings["network"]["ip"]
         self.port = settings["network"]["port"]
@@ -14,6 +24,15 @@ class ServerManager:
         self.conn = ServerSocket(self.ip, self.port, self.timeout)
 
     def __load_settings(self):
+        """
+            Carrega as configurações de rede do arquivo 'settings.json'.
+
+            Returns:
+                dict: Um dicionário contendo as configurações carregadas.
+
+            Raises:
+                RuntimeError: Se o arquivo de configuração não puder ser lido.
+        """
         try:
             with open(self.__SETTINGS_FILE, 'r') as f:
                 return json.load(f)
@@ -22,15 +41,10 @@ class ServerManager:
             raise RuntimeError(f"Can't read configuration file: {e}. Tried path: {tried_path}")
         
     def run(self):
+        """
+            Inicia a execução do loop principal do servidor.
+
+            Chama o método start() da instância ServerSocket.
+        """
         print(f"Servidor iniciado em {self.ip}:{self.port}")
         self.conn.start()
-
-'''
-if __name__ == "__main__":
-    # 1. Cria uma instância do ServerManager
-    manager = ServerManager()
-    
-    # 2. Chama o método run, que por sua vez chama ServerSocket.start()
-    #    Este método contém o loop infinito (while True) que mantém o servidor ativo.
-    manager.run()
-'''
