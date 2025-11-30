@@ -47,12 +47,27 @@ class ServerSocket:
         except:
             return print("\nNão foi possível iniciar o servidor!\n")
 
-        while True:
-            client, addr = self.server_socket.accept()
-            print(f"Nova conexão de {addr}")
+        try:
+            while True:
+                client, addr = self.server_socket.accept()
+                print(f"Nova conexão de {addr}")
 
-            client_handler = threading.Thread(target=self.handle_client, args=(client,))
-            client_handler.start()
+                client_handler = threading.Thread(target=self.handle_client, args=(client,))
+                client_handler.daemon = True
+                client_handler.start()
+        except KeyboardInterrupt: 
+            print("\nServidor encerrando por interrupção do usuário (Ctrl+C).")
+        finally:
+            self.__shutdown() # Método de desligamento
+
+    def __shutdown(self):
+        """
+            Executa o desligamento do servidor.
+        """
+        if self.server_socket:
+            self.server_socket.close()
+
+        print("Servidor desligado com sucesso")
 
     def __receive_all(self, client_socket, num_bytes:int) -> bytes | None:
         """
@@ -94,7 +109,6 @@ class ServerSocket:
         return assigned_ghost
 
     def __move_pacman(self):
-    
         while self.pacman_running:
 
             with self.lock:
@@ -103,12 +117,16 @@ class ServerSocket:
             time.sleep(0.2)
 
     def __map_sending(self, client_socket):
-
         COOLDOWN = 0.05
 
         while True:
-            self.send_matrix(client_socket)
-            time.sleep(COOLDOWN)
+            try:
+                self.send_matrix(client_socket)
+                time.sleep(COOLDOWN)
+            except (ConnectionResetError, BrokenPipeError) as e:
+                # O cliente fechou a conexão de forma inesperada.
+                print(f"Erro de conexão inesperada durante o envio de mapa ({e}). Encerrando thread de envio.")
+                break # Sai do loop, e a thread __map_sending termina
 
     def handle_client(self, client_socket):
         """
@@ -126,12 +144,14 @@ class ServerSocket:
         
         # 2. Cria outra thread para enviar o mapa constantemente
         map_sender = threading.Thread(target=self.__map_sending, args=(client_socket,))
+        map_sender.daemon = True
         map_sender.start()
 
         # 3. Cria outra thread para iniciar o PacMan
         if assigned_ghost and not self.pacman_running:
             self.pacman_running = True
             pacman_mover = threading.Thread(target=self.__move_pacman)
+            pacman_mover.daemon = True
             pacman_mover.start()
 
         # Loop de controle de movimento e envio de estado
@@ -160,13 +180,12 @@ class ServerSocket:
                 # Pausa para controle de taxa de atualização
                 time.sleep(0.05)
 
-            except ConnectionResetError:
-                print("Cliente desconectado")
+            except (ConnectionResetError, BrokenPipeError): 
+                print("Cliente desconectado (Reset ou Broken Pipe)")
                 break
             except Exception as e:
                 print(f"Erro na comunicação com o cliente: {e}")
                 break
-        
         self.remove_client(client_socket)
             
     def send_matrix(self, client_socket):
