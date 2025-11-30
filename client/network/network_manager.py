@@ -36,7 +36,7 @@ class NetworkManager:
     def disconnect_from_server(self):
         self.conn.close()
 
-    def send_input(self, input:PlayerAction):
+    def send_input(self, input: PlayerAction):
         """ Envia a entrada do jogador para o servidor.
 
         Serializa a entrada e adiciona um cabeçalho com o tamanho total 
