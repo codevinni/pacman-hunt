@@ -1,30 +1,63 @@
-from enum import IntEnum, Enum, auto
+'''
+Enumerações do jogo Pac-Man Hunt.
+Define:
+- Tipos de tiles (blocos do mapa)
+- Entidades vivas (Pac-Man e Fantasmas)
+- Tipos de itens coletáveis (PAC-DOT e POWER-PELLET)
+- Ações do jogador em coordenadas de movimento
+'''
 
-# Tipos de tiles (blocos do cenário).
+from enum import IntEnum, Enum
+
 class TileType(IntEnum):
+    """
+    Representa o tipo de bloco presente no labirinto.
+
+    Values:
+        EMPTY: Espaço livre onde entidades podem se mover.
+        WALL: Parede, impede movimento de entidades.
+        DOOR: Porta da casa dos fantasmas (Ghost House).
+        TUNNEL: Caminho lateral que conecta bordas do mapa.
+    """
     EMPTY = 0
     WALL = 1
-    DOOR = 2        # Porta da área do fantasma
-    TUNNEL = 3      # Passagem lateral do mapa
+    DOOR = 2
+    TUNNEL = 3
 
-# Entidades vivas no jogo (Pac-Man e Fantasmas).
 class EntityType(IntEnum):
-    PACMAN = 5
-    BLINKY = 6  
-    PINKY = 7    
-    INKY = 8     
-    CLYDE = 9    
+    """
+    Tipos de entidades vivas que podem existir no jogo.
 
-# Itens coletáveis.
+    Values:
+        PACMAN: Jogador principal.
+        BLINKY: Fantasma vermelho.
+        PINKY: Fantasma rosa.
+        INKY: Fantasma azul.
+        CLYDE: Fantasma laranja.
+    """
+    PACMAN = 5
+    BLINKY = 6
+    PINKY = 7
+    INKY = 8
+    CLYDE = 9
+
 class ItemType(IntEnum):
+    """
+    Representa os itens que podem estar presentes em uma célula.
+
+    Values:
+        PAC_DOT: Pequeno ponto comestível.
+        POWER_PELLET: Habilita Pac-Man a consumir fantasmas temporariamente.
+    """
     PAC_DOT = 10
     POWER_PELLET = 11
 
-# Ações (inputs) do jogador.
 class PlayerAction(Enum):
+    """
+    Direções que o jogador pode mover Pac-Man.
+    Cada ação armazena um deslocamento (dx, dy) aplicado no movimento.
+    """
     UP = (0, -1)
     DOWN = (0, 1)
     LEFT = (-1, 0)
     RIGHT = (1, 0)
-
-    
