@@ -12,13 +12,13 @@ from .cell import Cell
 # Atalhos para criação de Cells
 W: Cell = Cell(TileType.WALL)                     
 E = lambda item=None: Cell(TileType.EMPTY, item)  # Espaço vazio opcionalmente com item
+
+# Aliases/constantes para os membros do enum ItemType
 D: ItemType = ItemType.PAC_DOT
 P: ItemType = ItemType.POWER_PELLET
 
-
 # Matriz que representa o labirinto: Dimensões = 28 colunas × 31 linhas
 maze_matrix = [
-
     [W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W, W],
 
     [W, E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), W, W, E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), E(D), W],
