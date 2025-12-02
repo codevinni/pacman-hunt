@@ -13,27 +13,51 @@ class NetworkManager:
     __SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'settings.json')
 
     def __init__(self):
+        """ Lê o arquivo de configurações e instancia um objeto ClientSocket para comunicação
+        via socket por meio do IP e porta definidos.
 
-        settings = self.__load_settings()
-        self.ip = settings["network"]["ip"]
-        self.port = settings["network"]["port"]
-        self.timeout = settings["network"]["timeout"]
+        Raises:
+            GameNetworkError: Se houver algum erro na conexão. 
+        """
+        
+        try:
+            settings = self.__load_settings()
+            self.ip = settings["network"]["ip"]
+            self.port = settings["network"]["port"]
+            self.timeout = settings["network"]["timeout"]
 
-        self.conn = ClientSocket(self.ip, self.port, self.timeout)
+            self.conn = ClientSocket(self.ip, self.port, self.timeout)
+
+        except Exception as e:
+            raise GameNetworkError(f"Erro de conexão: {e}");
 
     def __load_settings(self):
+        """ Carrega o arquivo de configurações.
         
+        Raises:
+            RuntimeError: Se houver algum erro na leitura do arquivo. 
+        """
         try:
             with open(self.__SETTINGS_FILE, 'r') as f:
                 return json.load(f)
             
         except Exception as e:
-            raise RuntimeError(f"Can't read configuration file: {e}")
+            raise RuntimeError(f"Não foi possível ler o arquivo de configurações: {e}")
 
     def connect_to_server(self):
-        self.conn.connect()
+        """ Conecta-se ao servidor.
+        
+        Raises:
+            GameNetworkError: Se houver algum erro na conexão.  
+        """
+        try:
+            self.conn.connect()
+        except (ConnectionError, RuntimeError) as e:
+            raise GameNetworkError(f"Erro de conexão: {e}")
        
     def disconnect_from_server(self):
+        """ Desconecta-se do servidor.
+        """
         self.conn.close()
 
     def send_input(self, input: PlayerAction):
