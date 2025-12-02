@@ -48,6 +48,8 @@ class Matrix:
     
     def get_cell(self, x: int, y: int) -> Cell | None:
         '''
+        Retorna a célula na posição informada, caso a mesma exista.
+        
         Args:
             - x (int): Coordenada horizontal da célula.
             - y (int): Coordenada vertical da célula.
@@ -73,7 +75,7 @@ class Matrix:
 
         # Verifica limites da matriz
         if not (0 <= x < self.width() and 0 <= y < self.height()):
-            return None  
+            return False  
         
         # Verifica se a célula é caminhável
         return cell is not None and cell.is_walkable()
@@ -83,7 +85,10 @@ class Matrix:
         Retorna a posição atual ([x][y]) da entidade na matriz.
 
         Args:
-            entity_type (EntityType): Tipo da entidade (PACMAN, BLINKY, PINKY, INKY, CLYDE).
+            entity (EntityType): Tipo da entidade (PACMAN, BLINKY, PINKY, INKY, CLYDE).
+
+        Returns:
+            tuple[int,int] | None: Coordenadas (x, y) ou None se não existir.
         '''
         return self.entities.get(entity)
 
