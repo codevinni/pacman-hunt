@@ -6,7 +6,7 @@ import struct
 from .client_connection import ClientSocket
 from ..exceptions import GameNetworkError, SerializationError
 from common.enums import PlayerAction, EntityType
-from common.matrix import Matrix
+from common.game_state import GameState
 
 class NetworkManager:
 
@@ -99,18 +99,18 @@ class NetworkManager:
         ghost = self.__get_response()
         return ghost
        
-    def get_game_state(self) -> Matrix | None:
-        """ Obtém o estado atual do jogo através da matriz enviada pelo servidor.
+    def get_game_state(self) -> GameState | None:
+        """ Obtém o estado atual do jogo, recebido pelo servidor.
 
         Returns:
-            Matrix: A matriz do jogo se recebida com sucesso, None caso contrário.
+            GameState: Objeto que representa estado do jogo, se recebido com sucesso, None caso contrário.
 
         Raises:
             GameNetworkError: Se houver algum erro na conexão. 
             SerializationError: Se os dados recebidos estiverem incompletos ou corrompidos.
         """
-        matrix = self.__get_response()
-        return matrix
+        game_state = self.__get_response()
+        return game_state
         
         
     def __get_response(self):
@@ -126,7 +126,7 @@ class NetworkManager:
         HEADER_SIZE = 4
 
         try:
-            header = self.conn.receive(HEADER_SIZE) # Tamanho em bytes da matriz a ser recebida 
+            header = self.conn.receive(HEADER_SIZE) # Tamanho em bytes do objeto a ser recebido
 
             if not header:
                 return None

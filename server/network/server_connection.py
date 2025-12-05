@@ -3,7 +3,7 @@ import pickle
 import socket
 import struct
 import threading 
-from common.matrix import Matrix            
+from common.game_state import GameState            
 from common.enums import EntityType, PlayerAction 
 
 from ..pacman import PacmanIA
@@ -13,7 +13,7 @@ class ServerSocket:
         Define o servidor para conexões de socket TCP/IP.
 
         Gerencia o loop de aceitação de clientes, a comunicação thread-safe
-        com os clientes e a lógica de jogo (PacmanIA, Matrix).
+        com os clientes e a lógica de jogo (PacmanIA, GameState).
     """
     def __init__(self, server_ip:str, server_port:int, timeout: float = None):
         """
@@ -28,7 +28,7 @@ class ServerSocket:
         self.port = server_port
         self.timeout = timeout
 
-        self.matrix = Matrix()
+        self.game_state = GameState()
         self.pacman_ai = PacmanIA()
         self.pacman_running = False
 
@@ -138,7 +138,6 @@ class ServerSocket:
                 self.clients[client_socket] = assigned_ghost
 
                 # TODO: Implementar a lógica para colocar entidade na matriz inicial aqui
-                # self.matrix.set_entity_position(assigned_ghost, x_inicial, y_inicial)
             else:
                 self.clients[client_socket] = None
 
@@ -153,13 +152,13 @@ class ServerSocket:
         while self.pacman_running:
 
             with self.lock:
-                self.pacman_ai.update(self.matrix)
+                self.pacman_ai.update(self.game_state.matrix)
 
             time.sleep(0.2)
 
-    def __map_sending(self, client_socket):
+    def __game_state_sending(self, client_socket):
         """
-            Thread de envio contínuo do estado atual da matriz para o cliente.
+            Thread de envio contínuo do estado atual do jogo para o cliente.
 
             Args:
                 client_socket (socket): O socket do cliente para o qual enviar dados.
@@ -172,12 +171,12 @@ class ServerSocket:
 
         while True:
             try:
-                self.send_matrix(client_socket)
+                self.send_game_state(client_socket)
                 time.sleep(COOLDOWN)
             except (ConnectionResetError, BrokenPipeError) as e:
                 # O cliente fechou a conexão de forma inesperada.
-                print(f"Erro de conexão inesperada durante o envio de mapa ({e}). Encerrando thread de envio.")
-                break # Sai do loop, e a thread __map_sending termina
+                print(f"Erro de conexão inesperada durante o envio do estado do jogo ({e}). Encerrando thread de envio.")
+                break # Sai do loop, e a thread __game_state_sending termina
 
     def handle_client(self, client_socket):
         """
@@ -185,7 +184,7 @@ class ServerSocket:
 
             Este método roda em uma thread separada e é responsável por:
             1. Atribuir o fantasma.
-            2. Iniciar threads de envio de mapa e movimento do Pac-Man (se aplicável).
+            2. Iniciar threads de envio de estado de jogo e movimento do Pac-Man (se aplicável).
             3. Loop principal de recebimento de comandos do jogador (PlayerAction).
             4. Tratar desconexões abruptas (`ConnectionResetError`, `BrokenPipeError`).
 
@@ -207,10 +206,10 @@ class ServerSocket:
             self.remove_client(client_socket)
             return
         
-        # 2. Cria outra thread para enviar o mapa constantemente
-        map_sender = threading.Thread(target=self.__map_sending, args=(client_socket,))
-        map_sender.daemon = True # Usado para desligamento rápido
-        map_sender.start()
+        # 2. Cria outra thread para enviar o estado do jogo constantemente
+        game_state_sender = threading.Thread(target=self.__game_state_sending, args=(client_socket,))
+        game_state_sender.daemon = True # Usado para desligamento rápido
+        game_state_sender.start()
 
         # 3. Cria outra thread para iniciar o PacMan
         if assigned_ghost and not self.pacman_running:
@@ -240,7 +239,7 @@ class ServerSocket:
 
                     # Movimenta o fantasminha baseando no input
                     with self.lock:
-                        self.matrix.move_entity(assigned_ghost, delta_x, delta_y)
+                        self.game_state.matrix.move_entity(assigned_ghost, delta_x, delta_y)
 
                 # Pausa para controle de taxa de atualização
                 time.sleep(0.05)
@@ -253,11 +252,11 @@ class ServerSocket:
                 break
         self.remove_client(client_socket)
             
-    def send_matrix(self, client_socket):
+    def send_game_state(self, client_socket):
         """
-            Serializa a matriz (incluindo entidades) usando pickle e envia para o cliente.
+            Serializa o game_state usando pickle e envia para o cliente.
             
-            Protocolo: [4 bytes (tamanho do payload)] + [payload (matriz serializada)]
+            Protocolo: [4 bytes (tamanho do payload)] + [payload (game_state serializado)]
 
             Args:
                 client_socket (socket): O socket do cliente de destino.
@@ -266,14 +265,14 @@ class ServerSocket:
                 Exception: Propaga exceções de conexão ou struct.pack/pickle.
         """
         with self.lock:
-            # Serializa o objeto Matrix completo para incluir as entidades
-            payload = pickle.dumps(self.matrix)
+            # Serializa o objeto GameState completo para incluir as entidades
+            payload = pickle.dumps(self.game_state)
         
         self.send_data(client_socket, payload)
     
     def send_data(self, client_socket, data):
         """
-            Empacota e envia os dados (matriz ou EntityType) com o prefixo de 4 bytes do tamanho.
+            Empacota e envia os dados (GameState ou EntityType) com o prefixo de 4 bytes do tamanho.
 
             Args:
                 client_socket (socket): O socket do cliente de destino.

@@ -1,6 +1,7 @@
 import pygame
 import os
 from common.matrix import Matrix
+from common.game_state import GameState
 from common.enums import EntityType, PlayerAction
 from .game.config import *
 
@@ -79,7 +80,8 @@ def move_blinky(matrix, dx, dy):
 
 def main():
     pygame.init()
-    matrix = Matrix()
+    game_state = GameState()
+    matrix = game_state.matrix
 
     # -----------------------------
     # DETECTA TAMANHO DO MONITOR
@@ -165,7 +167,8 @@ def main():
         )
 
         # OBTEM A MATRIZ 
-        matrix = network_manager.get_game_state()
+        game_state = network_manager.get_game_state()
+        matrix = game_state.matrix
 
         # Renderização
         screen.fill(BLACK)

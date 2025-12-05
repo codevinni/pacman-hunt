@@ -7,7 +7,7 @@ Define:
 - Ações do jogador em coordenadas de movimento
 '''
 
-from enum import IntEnum, Enum
+from enum import IntEnum, Enum, auto
 
 class TileType(IntEnum):
     """
@@ -57,7 +57,16 @@ class PlayerAction(Enum):
     Direções que o jogador pode mover Pac-Man.
     Cada ação armazena um deslocamento (dx, dy) aplicado no movimento.
     """
-    UP = (0, -1)
-    DOWN = (0, 1)
-    LEFT = (-1, 0)
-    RIGHT = (1, 0)
+    UP = auto()
+    DOWN = auto()
+    LEFT = auto()
+    RIGHT = auto()
+
+class GameStatus(Enum):
+    """
+    Define os estados possíveis da partida.
+    """
+    WAITING_PLAYERS = auto() 
+    RUNNING = auto()
+    PACMAN_VICTORY = auto() 
+    GHOSTS_VICTORY = auto()
