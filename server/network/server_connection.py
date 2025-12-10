@@ -178,6 +178,56 @@ class ServerSocket:
                 print(f"Erro de conexão inesperada durante o envio do estado do jogo ({e}). Encerrando thread de envio.")
                 break # Sai do loop, e a thread __game_state_sending termina
 
+    def __ghost_movement(self, assigned_ghost, client_context):
+        """
+            Executa o loop de movimento contínuo para o fantasma de um cliente.
+
+            Esta função verifica periodicamente a última direção solicitada pelo cliente (`current_action`)
+            e aplica o movimento na matriz do jogo. O movimento persiste na mesma direção até que:
+            1. O cliente envie uma nova direção.
+            2. O fantasma encontre um obstáculo, momento em que a ação é resetada para None.
+
+            O acesso ao estado do jogo (`self.game_state`) é protegido por `self.lock` para garantir
+            a integridade dos dados em ambiente multithread.
+
+            Args:
+                assigned_ghost (EntityType): O tipo de fantasma (BLINKY, PINKY, etc.) controlado.
+                client_context (dict): Dicionário compartilhado para sincronização entre a thread de recebimento
+                                    e esta thread de movimento. Deve conter:
+                                    - 'running' (bool): Controle de execução do loop.
+                                    - 'current_action' (PlayerAction | None): A direção atual do movimento.
+        """
+        movement_map = { # Mapeamento de ações para deltas (x, y)
+            PlayerAction.UP: (0, -1),
+            PlayerAction.RIGHT: (1, 0),
+            PlayerAction.DOWN: (0, 1),
+            PlayerAction.LEFT: (-1, 0),
+        }
+
+        MOVE_INTERVAL = 0.2
+
+        while client_context['running']:
+            action = client_context['current_action']
+
+            if action and action in movement_map:
+                dx, dy = movement_map[action]
+
+                with self.lock:
+                    # Verifica posição do fantasma
+                    current_pos = self.game_state.matrix.get_entity_position(assigned_ghost)
+
+                    if current_pos:
+                        nx, ny = current_pos[0] + dx, current_pos[1] + dy
+
+                        # Verifica se a próxima posição é válida
+                        if self.game_state.matrix.is_valid_position(nx, ny):
+                            # Se livre, move
+                            self.game_state.matrix.move_entity(assigned_ghost, dx, dy)
+                        else:
+                            # Se bateu na parede, para o movimento contínuo
+                            client_context['current_action'] = None
+            time.sleep(MOVE_INTERVAL)
+
     def handle_client(self, client_socket):
         """
             Lida com a comunicação e lógica de jogo para um cliente específico.
@@ -198,7 +248,7 @@ class ServerSocket:
         """
         assigned_ghost = self.__assign_ghost(client_socket)
 
-        # 1. Envia atribuição de fantasma (ou espectador)
+        # Envia atribuição de fantasma (ou espectador)
         try:
             self.send_data(client_socket, assigned_ghost)
         except Exception as e:
@@ -206,43 +256,42 @@ class ServerSocket:
             self.remove_client(client_socket)
             return
         
-        # 2. Cria outra thread para enviar o estado do jogo constantemente
+        # Thread que envia o estado do jogo constantemente
         game_state_sender = threading.Thread(target=self.__game_state_sending, args=(client_socket,))
         game_state_sender.daemon = True # Usado para desligamento rápido
         game_state_sender.start()
 
-        # 3. Cria outra thread para iniciar o PacMan
+        # Thread que inicia o PacMan
         if assigned_ghost and not self.pacman_running:
             self.pacman_running = True
             pacman_mover = threading.Thread(target=self.__move_pacman)
             pacman_mover.daemon = True # Usado para desligamento rápido
             pacman_mover.start()
 
+        client_context = {
+            'running': True,          # Controla o loop da thread de movimento
+            'current_action': None    # Armazena a última tecla válida pressionada
+        }
+
+        # Se o cliente controla um fantasma, inicia a thread de movimento dele
+        if assigned_ghost:
+            ghost_mover = threading.Thread(target=self.__ghost_movement, args=(assigned_ghost, client_context))
+            ghost_mover.daemon = True
+            ghost_mover.start()
+
         # Loop de controle de movimento e envio de estado
         while True:
             try:
-                # 4. Receber a entrada do cliente (movimentação)
+                # Recebe a entrada do cliente (movimentação)
                 client_input_data: PlayerAction = self.receive_data(client_socket)
 
                 if assigned_ghost and client_input_data:
-                    # Se o cliente é um jogador e enviou uma ação
-                    print(f"Fantasma {assigned_ghost.name} recebeu ação: {client_input_data.name}")
+                    print(f"Fantasma {assigned_ghost.name} mudou direção para: {client_input_data.name}")
+                    # Atualiza a direção na thread de movimento
+                    client_context['current_action'] = client_input_data
 
-                    movement_map = {
-                        PlayerAction.UP: (0, -1),
-                        PlayerAction.RIGHT: (1, 0),
-                        PlayerAction.DOWN: (0, 1),
-                        PlayerAction.LEFT: (-1,0),
-                    }
-
-                    delta_x, delta_y = movement_map[client_input_data]
-
-                    # Movimenta o fantasminha baseando no input
-                    with self.lock:
-                        self.game_state.matrix.move_entity(assigned_ghost, delta_x, delta_y)
-
-                # Pausa para controle de taxa de atualização
-                time.sleep(0.05)
+                # Pausa para não consumir 100% da CPU
+                time.sleep(0.01)
 
             except (ConnectionResetError, BrokenPipeError): 
                 print("Cliente desconectado (Reset ou Broken Pipe)")
@@ -250,6 +299,8 @@ class ServerSocket:
             except Exception as e:
                 print(f"Erro na comunicação com o cliente: {e}")
                 break
+        
+        client_context['running'] = False
         self.remove_client(client_socket)
             
     def send_game_state(self, client_socket):
