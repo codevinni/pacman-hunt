@@ -32,6 +32,10 @@ class ServerSocket:
         self.pacman_ai = PacmanIA()
         self.pacman_running = False
 
+        # Flags para controlar thread de update do jogo
+        self.game_running = True
+        self.game_update_thread = None
+
         self.server_socket = None
         self.clients = {}
 
@@ -66,6 +70,11 @@ class ServerSocket:
             return print("\nNão foi possível iniciar o servidor!\n")
 
         try:
+            # Inicia thread de atualização do jogo (game_state)
+            self.game_update_thread = threading.Thread(target=self.__game_update_loop)
+            self.game_update_thread.daemon = True
+            self.game_update_thread.start()
+
             while True:
                 client, addr = self.server_socket.accept()
                 print(f"Nova conexão de {addr}")
@@ -73,10 +82,27 @@ class ServerSocket:
                 client_handler = threading.Thread(target=self.handle_client, args=(client,))
                 client_handler.daemon = True # Usado para desligamento rápido
                 client_handler.start()
+
         except KeyboardInterrupt: 
             print("\nServidor encerrando por interrupção do usuário (Ctrl+C).")
         finally:
             self.__shutdown() # Método de desligamento
+
+    def __game_update_loop(self):
+        """
+            Thread dedicada à atualização contínua do estado do jogo.
+            Responsável por manter a lógica do jogo funcionando independentemente das operações de rede.
+        """
+        # Intervalo entre atualizações em segundos
+        UPDATE_INTERVAL = 0.05
+        
+        # Loop principal de atualização do jogo
+        while self.game_running:
+            with self.lock:
+                # Executa uma atualização completa do estado do jogo
+                self.game_state.update()
+                
+            time.sleep(UPDATE_INTERVAL)
 
     def __shutdown(self):
         """
@@ -84,8 +110,14 @@ class ServerSocket:
 
             Garante que o socket de escuta seja fechado.
         """
-        if self.server_socket:
-            self.server_socket.close()
+        self.game_running = False
+    
+        # Aguarda a thread de atualização do jogo finalizar, com timeout de 2 segundos
+        if self.game_update_thread:
+            self.game_update_thread.join(timeout=2.0)
+
+            if self.server_socket:
+                self.server_socket.close()
 
         print("Servidor desligado com sucesso")
 
@@ -153,7 +185,6 @@ class ServerSocket:
 
             with self.lock:
                 self.pacman_ai.update(self.game_state)
-                self.game_state.update()   # Atualiza o estado do jogo 
 
             time.sleep(0.2)
 

@@ -199,8 +199,8 @@ class PacmanIA:
                         collected_item = matriz.move_entity(EntityType.PACMAN, nx - pos_pac[0], ny - pos_pac[1])
                         if collected_item == ItemType.POWER_PELLET:
                             game_state.activate_frightened_mode()
-                            print("Power Pellet coletado! Modo Frightened ativado!")
                         return
+                    
                     elif len(caminho) > 2:  # Tenta o próximo no caminho
                         proximo = caminho[2]
                         nx, ny = proximo
@@ -208,7 +208,6 @@ class PacmanIA:
                         collected_item = matriz.move_entity(EntityType.PACMAN, nx - pos_pac[0], ny - pos_pac[1])
                         if collected_item == ItemType.POWER_PELLET:
                             game_state.activate_frightened_mode()
-                            print("Power Pellet coletado! Modo Frightened ativado!")
                         return
 
         # 3) Está seguro → busca dots
@@ -225,7 +224,6 @@ class PacmanIA:
                     collected_item = matriz.move_entity(EntityType.PACMAN, nx - pos_pac[0], ny - pos_pac[1])
                     if collected_item == ItemType.POWER_PELLET:
                         game_state.activate_frightened_mode()
-                        print("Power Pellet coletado! Modo Frightened ativado!")
                     return
 
         # 4) Último recurso: move para qualquer vizinho seguro
@@ -253,4 +251,4 @@ class PacmanIA:
                 collected_item = matriz.move_entity(EntityType.PACMAN, nx - pos_pac[0], ny - pos_pac[1])
                 if collected_item == ItemType.POWER_PELLET:
                     game_state.activate_frightened_mode()
-                    print("Power Pellet coletado! Modo Frightened ativado!")
+                return  
