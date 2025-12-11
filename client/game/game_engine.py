@@ -144,32 +144,8 @@ class Game:
                 self.running = False
 
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_F11:
-                    self.toggle_fullscreen()
-
-        keys = pygame.key.get_pressed()
-        moving = False
-        
-        if keys[pygame.K_UP]:
-            self.network_manager.send_input(PlayerAction.UP)
-            moving = True
-
-        elif keys[pygame.K_DOWN]:
-            self.network_manager.send_input(PlayerAction.DOWN)
-            moving = True
-
-        elif keys[pygame.K_LEFT]:
-            self.network_manager.send_input(PlayerAction.LEFT)
-            moving = True
-            
-        elif keys[pygame.K_RIGHT]:
-            self.network_manager.send_input(PlayerAction.RIGHT)
-            moving = True
-            
-        if not moving:
-            self.network_manager.send_input(PlayerAction.STOP)
-
-
+                if event.key in self.key_actions:
+                    self.network_manager.send_input(self.key_actions[event.key])
     
     def init_entity_animation_state(self):
         """Inicializa estados de direção, frames, timers e posição anterior."""
@@ -199,9 +175,6 @@ class Game:
             self.anim_frame[entity] = 0
             self.anim_timer[entity] = now
 
-    
-    
-    
     def _update_animations(self):
         """Atualiza frames de animação por entidade com timers separados."""
         now = pygame.time.get_ticks()

@@ -63,8 +63,7 @@ class GameRenderer:
                 self.draw_tile(cell, x, y, tile_size)
 
             
-    def draw_entities(self, visual_entities, tile_size, ghost_sprites,
-                      pacman_sprite, entity_dirs, anim_frames):
+    def draw_entities(self, visual_entities, tile_size, ghost_sprites, pacman_sprite, entity_dirs, anim_frames):
         """
         Desenha TODAS as entidades usando:
         - posição suavizada do SmoothEntity
