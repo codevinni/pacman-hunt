@@ -1,5 +1,5 @@
 # game/game.py
-import pygame
+import pygame, os
 from common.matrix import Matrix
 from common.game_state import GameState
 from common.enums import PlayerAction, EntityType
@@ -7,20 +7,23 @@ from client.game.config import *
 from ..network.network_manager import NetworkManager
 from client.utils.smooth_entity import SmoothEntity
 from client.utils.asset_loader import load_image, get_asset_path
-# para carregar sprite sheet e manipular imagens já existentes
 from client.game.config import LARGURA_SPRITE, ALTURA_SPRITE
-# se não tiver essas constantes no config, substitua pelos valores inteiros (ex: 32)
+from client.game.menu import GameMenu
 
 from client.game.renderer import GameRenderer
+
+HUD_BOTTOM_HEIGHT = 80   # altura reservada abaixo do mapa
 
 class Game:
     def __init__(self):
         self.game_state = GameState()
         self.matrix = self.game_state.matrix
-        
-        # Inicialização do PyGame
+        self.menu = GameMenu(self)
         pygame.init()
         self._setup_window()
+        self.menu_open = False
+        self.fullscreen = False
+        self.font = pygame.font.Font(get_asset_path("fonts/Emulogic-zrEw.ttf"), 16)
 
         self.visual_entities = {
             EntityType.PACMAN: SmoothEntity(14, 23, self.tile_size), # Posição inicial Pacman
@@ -71,82 +74,112 @@ class Game:
         }
     
     def _setup_window(self):
-        """Configura a janela do jogo com base no tamanho do monitor"""
         info = pygame.display.Info()
         monitor_w = info.current_w
         monitor_h = info.current_h
         
-        # Dimensões do labirinto
         tiles_x = self.matrix.width()
         tiles_y = self.matrix.height()
+
+        self.tile_size = min(monitor_w // tiles_x, monitor_h // tiles_y)
+        window_w = tiles_x * self.tile_size
+        window_h = tiles_y * self.tile_size + HUD_BOTTOM_HEIGHT
+
         
-        # Calcula o melhor tamanho de tile possível
-        tile_size = min(monitor_w // tiles_x, monitor_h // tiles_y)
-        
-        # Tamanho final da janela
-        window_w = tiles_x * tile_size
-        window_h = tiles_y * tile_size
-        
-        # Cria a janela
-        self.screen = pygame.display.set_mode((window_w, window_h))
+        self.screen = pygame.display.set_mode((monitor_w, monitor_h)) 
         pygame.display.set_caption("Pac-Man Hunt")
-        self.tile_size = tile_size
-    
+
+        self._compute_offsets()
+
     def _load_assets(self):
-        """Carrega todas as imagens necessárias (suporta spritesheet se disponível)."""
-        try:
-            sprite_sheet = load_image(get_asset_path("sprites.png"))
-        except Exception:
-            sprite_sheet = None
+        sheet = load_image(get_asset_path("sprites.png"))
 
-        # prepara pacman frames
-        if sprite_sheet:
-            self.pacman_sprites = [
-                sprite_sheet.subsurface(pygame.Rect(0 * LARGURA_SPRITE, 0 * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy(),
-                sprite_sheet.subsurface(pygame.Rect(1 * LARGURA_SPRITE, 0 * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy()
-            ]     
+        # Pac-Man usa linha 0
+        self.pacman_sprites = [
+            sheet.subsurface(pygame.Rect(0 * LARGURA_SPRITE, 0 * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy(),
+            sheet.subsurface(pygame.Rect(1 * LARGURA_SPRITE, 0 * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy(),
+        ]
 
-        # prepara sprites dos fantasmas por direção
+        # Constante: pacman_image começa no frame 0
+        self.pacman_image = self.pacman_sprites[0]
+
+        # SPRITES DOS FANTASMAS
+        GHOST_SHEET_LINE = {
+            "blinky": 4,
+            "pinky": 5,
+            "inky": 6,
+            "clyde": 7,
+        }
+
         self.ghost_sprites = {}
-        # linhas por fantasma (conforme você confirmou)
-        GHOST_SHEET_LINE = {"blinky": 4, "pinky": 5, "inky": 6, "clyde": 7}
-        if sprite_sheet:
-            for name, line in GHOST_SHEET_LINE.items():
-                    self.ghost_sprites[name] = {
-                        "right": [
-                            sprite_sheet.subsurface(pygame.Rect(0 * LARGURA_SPRITE, line * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy(),
-                            sprite_sheet.subsurface(pygame.Rect(1 * LARGURA_SPRITE, line * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy()
-                        ],
-                        "left": [
-                            sprite_sheet.subsurface(pygame.Rect(2 * LARGURA_SPRITE, line * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy(),
-                            sprite_sheet.subsurface(pygame.Rect(3 * LARGURA_SPRITE, line * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy()
-                        ],
-                        "up": [
-                            sprite_sheet.subsurface(pygame.Rect(4 * LARGURA_SPRITE, line * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy(),
-                            sprite_sheet.subsurface(pygame.Rect(5 * LARGURA_SPRITE, line * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy()
-                        ],
-                        "down": [
-                            sprite_sheet.subsurface(pygame.Rect(6 * LARGURA_SPRITE, line * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy(),
-                            sprite_sheet.subsurface(pygame.Rect(7 * LARGURA_SPRITE, line * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy()
-                        ]
-                    }
 
-    
+        for name, row in GHOST_SHEET_LINE.items():
+            self.ghost_sprites[name] = {
+                "right": [
+                    sheet.subsurface(pygame.Rect(0 * LARGURA_SPRITE, row * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy(),
+                    sheet.subsurface(pygame.Rect(1 * LARGURA_SPRITE, row * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy(),
+                ],
+                "left": [
+                    sheet.subsurface(pygame.Rect(2 * LARGURA_SPRITE, row * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy(),
+                    sheet.subsurface(pygame.Rect(3 * LARGURA_SPRITE, row * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy(),
+                ],
+                "up": [
+                    sheet.subsurface(pygame.Rect(4 * LARGURA_SPRITE, row * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy(),
+                    sheet.subsurface(pygame.Rect(5 * LARGURA_SPRITE, row * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy(),
+                ],
+                "down": [
+                    sheet.subsurface(pygame.Rect(6 * LARGURA_SPRITE, row * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy(),
+                    sheet.subsurface(pygame.Rect(7 * LARGURA_SPRITE, row * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy(),
+                ],
+            }
+
     def _setup_network(self):
         """Configura a conexão com o servidor"""
         self.network_manager.connect_to_server()
         self.ghost_type = self.network_manager.get_my_ghost()
     
+    def _handle_special_keys(self):
+        """Gerencia teclas especiais (menu, fullscreen, sair)."""
+        keys = pygame.key.get_pressed()
+
+        # Abre/fecha menu
+        if keys[pygame.K_p]:
+            self.menu_open = not self.menu_open
+            pygame.time.wait(150)  # evita repeat de toggle
+
+        # Tela cheia (F11)
+        if keys[pygame.K_F11]:
+            self.toggle_fullscreen()
+            pygame.time.wait(150)
+
+        # Sair
+        if keys[pygame.K_ESCAPE] and self.menu_open:
+            self.running = False
+
     def _handle_events(self):
         """Processa eventos do PyGame"""
         for event in pygame.event.get():
+            
             if event.type == pygame.QUIT:
                 self.running = False
+                
 
             if event.type == pygame.KEYDOWN:
                 if event.key in self.key_actions:
                     self.network_manager.send_input(self.key_actions[event.key])
-    
+   
+    def toggle_fullscreen(self):
+        """Alterna entre fullscreen e janela."""
+        self.fullscreen = not self.fullscreen
+
+        if self.fullscreen:
+            pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+        else:
+            # volta ao modo janela calculado pelo setup_window
+            self._setup_window()
+        
+        self._compute_offsets()
+
     def init_entity_animation_state(self):
         """Inicializa estados de direção, frames, timers e posição anterior."""
         
@@ -197,7 +230,6 @@ class Game:
                 self.anim_frame[et] ^= 1
                 self.anim_timer[et] = now
 
-
     def _update_game_state(self):
         """Atualiza o estado do jogo a partir do servidor"""
         new_state = self.network_manager.get_game_state()
@@ -241,20 +273,148 @@ class Game:
                         except Exception:
                             pass
 
-    
+    def _compute_offsets(self):
+        """
+        Calcula o deslocamento (offset) para centralizar o mapa na janela.
+        """
+        window_w, window_h = self.screen.get_size()
+        map_w = self.matrix.width() * self.tile_size
+        map_h = self.matrix.height() * self.tile_size
+
+        self.offset_x = (window_w - map_w) // 2
+        self.offset_y = (window_h - map_h) // 2
+ 
     def _render(self):
         """Renderiza o jogo na tela."""
         self.screen.fill(BLACK)
-        self.renderer.draw_matrix(self.matrix, self.tile_size)
+        self.renderer.draw_matrix(self.matrix, self.tile_size, self.offset_x, self.offset_y)
         self.renderer.draw_entities(
-            visual_entities=self.visual_entities,
-            tile_size=self.tile_size,
-            ghost_sprites=self.ghost_sprites,
-            pacman_sprite=self.pacman_sprites[self.anim_frame[EntityType.PACMAN]],
-            entity_dirs=self.entity_dirs,
-            anim_frames=self.anim_frame
-        )
+                    visual_entities=self.visual_entities,
+                    tile_size=self.tile_size,
+                    ghost_sprites=self.ghost_sprites,
+                    pacman_sprite=self.pacman_sprites[self.anim_frame[EntityType.PACMAN]],
+                    entity_dirs=self.entity_dirs,
+                    anim_frames=self.anim_frame,
+                    offset_x=self.offset_x,
+                    offset_y=self.offset_y
+                )
+
+        if self.menu_open:
+            self.draw_menu()
+            pygame.display.update()
+            return
+        self._draw_hud()
         pygame.display.update()
+
+    def draw_menu(self):
+        """Desenha o menu de pausa."""
+        overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))  # Fundo semitransparente
+        self.screen.blit(overlay, (0, 0))
+
+        lines = [
+            "MENU DE OPÇÕES",
+            "",
+            f"Modo de Tela: {'Fullscreen' if self.fullscreen else 'Janela'}",
+            "Pressione F11 para alternar",
+            "",
+            "Pressione ESC para sair do jogo",
+            "Pressione P para continuar",
+        ]
+
+        y = 100
+        for text in lines:
+            rendered = self.font.render(text, True, (255, 255, 255))
+            x = (self.screen.get_width() - rendered.get_width()) // 2
+            self.screen.blit(rendered, (x, y))
+            y += 40
+     
+    def _draw_hud(self):
+        """
+        Desenha o HUD:
+        - Leaderboards (esquerda)
+        - Pause (direita, topo)
+        - Vidas do Pac-Man (abaixo do mapa)
+        """
+
+        WHITE = (255, 255, 255)
+
+        # ============= LEADERBOARD (ESQUERDA) =============
+        x_leader = 20
+        y_leader = 20
+
+        # Título
+        label = self.font.render("Leaderboard", True, WHITE)
+        self.screen.blit(label, (x_leader, y_leader))
+        y_leader += 40
+
+        # lista de fantasmas em ordem fixa
+        ordered_ghosts = [
+            EntityType.BLINKY,
+            EntityType.PINKY,
+            EntityType.INKY,
+            EntityType.CLYDE
+        ]
+
+        ghost_names = {
+            EntityType.BLINKY: "Blinky",
+            EntityType.PINKY:  "Pinky",
+            EntityType.INKY:   "Inky",
+            EntityType.CLYDE:  "Clyde"
+        }
+
+        for ghost in ordered_ghosts:
+            # pega sprite animado atual
+            name = ghost.name.lower()
+            direction = self.entity_dirs.get(ghost, "right")
+            frame = self.anim_frame.get(ghost, 0) % 2
+            sprite = self.ghost_sprites[name][direction][frame]
+            sprite = pygame.transform.scale(sprite, (32, 32))
+
+            self.screen.blit(sprite, (x_leader, y_leader))
+
+            # nome + pontuação
+            score = self.game_state.scores.get(ghost, 0)
+            text = f"{ghost_names[ghost]}  {score}"
+            text_surf = self.font.render(text, True, WHITE)
+            self.screen.blit(text_surf, (x_leader + 40, y_leader + 5))
+
+            y_leader += 45
+
+        # ============= PAUSE (DIREITA) =============
+        pause_text = self.font.render("Pause (P)", True, WHITE)
+        pause_x = self.screen.get_width() - pause_text.get_width() - 20
+        pause_y = 20
+        self.screen.blit(pause_text, (pause_x, pause_y))
+
+        # ============= VIDAS DO PAC-MAN (ABAIXO DO MAPA) =============
+
+        # distância do mapa
+        hud_space = 20
+        bottom_y = self.offset_y + self.matrix.height() * self.tile_size + hud_space
+
+        life_icon = pygame.transform.scale(self.pacman_sprites[0], (32, 32))
+
+        lives = self.game_state.pacman_lives
+
+        for i in range(lives):
+            lx = self.offset_x + i * 40
+            self.screen.blit(life_icon, (lx, bottom_y))
+
+    def _draw_pacman_lives(self):
+        lives = self.game_state.pacman_lives
+
+        # posição inicial
+        start_x = self.offset_x + 20
+        start_y = self.offset_y + self.matrix.height() * self.tile_size + 20
+
+        life_sprite = pygame.transform.scale(
+            self.pacman_sprites[0],
+            (self.tile_size, self.tile_size)
+        )
+
+        for i in range(lives):
+            self.screen.blit(life_sprite, (start_x + i * (self.tile_size + 10), start_y))
 
     
     def run(self):
@@ -262,6 +422,7 @@ class Game:
         while self.running:
             self.clock.tick(60)
             self._handle_events()
+            self._handle_special_keys()
             self._update_game_state()
             # atualiza targets -> SmoothEntities já têm os destinos
             for entity in self.visual_entities.values():
