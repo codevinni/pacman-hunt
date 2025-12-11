@@ -55,19 +55,47 @@ class GameRenderer:
         scaled_image = pygame.transform.scale(image, (tile_size, tile_size))
         self.surface.blit(scaled_image, (x, y))
     
-    def draw_matrix(self, matrix, tile_size, blinky_img, pacman_image, visual_entities):
-        """Desenha o mapa completo com todas as entidades"""
-        # Desenha o labirinto estático (Tiles)
+    
+    def draw_matrix(self, matrix, tile_size):
+        """Desenha somente o labirinto estático (tiles)"""
         for y, row in enumerate(matrix.matrix):
             for x, cell in enumerate(row):
                 self.draw_tile(cell, x, y, tile_size)
-        
-        # Desenha as entidades
-        if EntityType.PACMAN in visual_entities: # Pacman
-            px, py = visual_entities[EntityType.PACMAN].get_pos()
-            self.draw_entity(px, py, pacman_image, tile_size)
-        
-        # Posteriormente fazer loop para desenhar também os outros fantasmas
-        if EntityType.BLINKY in visual_entities: # Fantasmas
-            px, py = visual_entities[EntityType.BLINKY].get_pos()
-            self.draw_entity(px, py, blinky_img, tile_size)
+
+            
+    def draw_entities(self, visual_entities, tile_size, ghost_sprites,
+                      pacman_sprite, entity_dirs, anim_frames):
+        """
+        Desenha TODAS as entidades usando:
+        - posição suavizada do SmoothEntity
+        - sprites da sprite-sheet
+        - direções calculadas automaticamente
+        - animação frame a frame
+        """
+        for et, smooth in visual_entities.items():
+            try:
+                x, y = smooth.get_pos()
+            except Exception:
+                continue
+
+            # PACMAN
+            if et == EntityType.PACMAN:
+                sprite = pygame.transform.scale(pacman_sprite, (tile_size, tile_size))
+                self.surface.blit(sprite, (x, y))
+                continue
+
+            # FANTASMAS
+            name = et.name.lower()
+            if name not in ghost_sprites:
+                continue
+
+            # direção calculada no Game
+            direction = entity_dirs.get(et, "right")
+
+            # frame
+            frame = anim_frames.get(et, 0) % 2
+
+            sprite = ghost_sprites[name][direction][frame]
+            sprite = pygame.transform.scale(sprite, (tile_size, tile_size))
+
+            self.surface.blit(sprite, (x, y))
