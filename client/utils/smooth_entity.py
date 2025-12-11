@@ -34,7 +34,7 @@ class SmoothEntity:
         self.y += (self.target_y - self.y) * self.lerp_factor
 
         # Garantindo que a entidade esteja perfeitamente centralizada # TODO: ajustar levemente (fantasma está entrando levemente na parede nas curvas)
-        epsilon = 0.5 
+        epsilon = 0.5
 
         if abs(self.target_x - self.x) < epsilon:
             self.x = self.target_x
