@@ -1,7 +1,7 @@
 import pygame
 
 class SmoothEntity:
-    def __init__(self, start_grid_x, start_grid_y, tile_size, lerp_factor=0.3):
+    def __init__(self, start_grid_x, start_grid_y, tile_size, lerp_factor=0.4):
         self.tile_size = tile_size
         self.lerp_factor = lerp_factor # Define uma "suavidade"
 
@@ -34,7 +34,7 @@ class SmoothEntity:
         self.y += (self.target_y - self.y) * self.lerp_factor
 
         # Garantindo que a entidade esteja perfeitamente centralizada # TODO: ajustar levemente (fantasma está entrando levemente na parede nas curvas)
-        epsilon = 0.5
+        epsilon = 2.0
 
         if abs(self.target_x - self.x) < epsilon:
             self.x = self.target_x

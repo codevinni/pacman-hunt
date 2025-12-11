@@ -239,25 +239,45 @@ class ServerSocket:
         MOVE_INTERVAL = 0.2
 
         while client_context['running']:
-            action = client_context['current_action']
+            current_action = client_context['current_action']
+            next_action = client_context['next_action']
 
-            if action and action in movement_map:
-                dx, dy = movement_map[action]
+            move_performed = False
 
-                with self.lock:
-                    # Verifica posição do fantasma
-                    current_pos = self.game_state.matrix.get_entity_position(assigned_ghost)
+            with self.lock:
+                pos = self.game_state.matrix.get_entity_position(assigned_ghost)
 
-                    if current_pos:
-                        nx, ny = current_pos[0] + dx, current_pos[1] + dy
+                if not pos:
+                    time.sleep(MOVE_INTERVAL)
+                    continue
 
-                        # Verifica se a próxima posição é válida
-                        if self.game_state.matrix.is_valid_position(nx, ny):
-                            # Se livre, move
-                            self.game_state.matrix.move_entity(assigned_ghost, dx, dy)
-                        else:
-                            # Se bateu na parede, para o movimento contínuo
-                            client_context['current_action'] = None
+                cx, cy = pos
+
+                # Curva
+                if next_action and next_action in movement_map:
+                    dx, dy = movement_map[next_action]
+                    nx, ny = cx + dx, cy + dy
+
+                    if self.game_state.matrix.is_valid_position(nx, ny):
+                        # Executa a curva e atualiza a direção atual
+                        self.game_state.matrix.move_entity(assigned_ghost, dx, dy)
+                        client_context['current_action'] = next_action
+                        client_context['next_action'] = None
+                        move_performed = True
+                    else:
+                        # Falha: é parede
+                        client_context['next_action'] = None
+
+                # Mantém movimento atual
+                if not move_performed and current_action and current_action in movement_map:
+                    dx, dy = movement_map[current_action]
+                    nx, ny = cx + dx, cy + dy
+
+                    if self.game_state.matrix.is_valid_position(nx, ny):
+                        # Continua na direção corrente
+                        self.game_state.matrix.move_entity(assigned_ghost, dx, dy)
+                    else:
+                        client_context['current_action'] = None
             time.sleep(MOVE_INTERVAL)
 
     def handle_client(self, client_socket):
@@ -302,7 +322,8 @@ class ServerSocket:
 
         client_context = {
             'running': True,          # Controla o loop da thread de movimento
-            'current_action': None    # Armazena a última tecla válida pressionada
+            'current_action': None,    # Direção que o fantasma está
+            'next_action': None       # Próxima direção solicitada pelo cliente
         }
 
         # Se o cliente controla um fantasma, inicia a thread de movimento dele
@@ -318,9 +339,9 @@ class ServerSocket:
                 client_input_data: PlayerAction = self.receive_data(client_socket)
 
                 if assigned_ghost and client_input_data:
-                    # print(f"Fantasma {assigned_ghost.name} mudou direção para: {client_input_data.name}")
-                    # Atualiza a direção na thread de movimento
-                    client_context['current_action'] = client_input_data
+                    print(f"Fantasma {assigned_ghost.name} solicitou direção: {client_input_data.name}")
+                    # Armazena a nova direção solicitada, mas não a executa imediatamente 
+                    client_context['next_action'] = client_input_data
 
                 # Pausa para não consumir 100% da CPU
                 time.sleep(0.01)
