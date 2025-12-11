@@ -61,6 +61,7 @@ class PlayerAction(Enum):
     DOWN = auto()
     LEFT = auto()
     RIGHT = auto()
+    STOP = auto()
 
 class GameStatus(Enum):
     """

@@ -29,32 +29,21 @@ class Game:
             EntityType.PINKY: SmoothEntity(14, 14, self.tile_size),
             EntityType.CLYDE: SmoothEntity(15, 14, self.tile_size),
         }
-        
         # último grid conhecido (tupla x,y) por entidade — usado para calcular delta
         self.prev_grid = {}
+        
         # direção estimada por entidade: "up","down","left","right"
         self.entity_dirs = {}
+        
         # frame de animação (0 ou 1) por entidade
         self.anim_frame = {}
+        
         # timers por entidade (ms)
         self.anim_timer = {}
         
-        # inicializa estados (se já houver posição no matrix, usa; caso contrário, None)
-        for et in (EntityType.PACMAN, EntityType.BLINKY, EntityType.INKY, EntityType.PINKY, EntityType.CLYDE):
-            try:
-                pos = self.matrix.get_entity_position(et)
-            except Exception:
-                pos = None
-            if pos:
-                self.prev_grid[et] = (pos[0], pos[1])
-            else:
-                self.prev_grid[et] = None
-
-            self.entity_dirs[et] = "right"
-            self.anim_frame[et] = 0
-            self.anim_timer[et] = pygame.time.get_ticks()
-
-        
+        # inicializa estados de animação
+        self.init_entity_animation_state()
+  
         # Carregamento de assets
         self._load_assets()
         
@@ -141,7 +130,7 @@ class Game:
                             sprite_sheet.subsurface(pygame.Rect(7 * LARGURA_SPRITE, line * ALTURA_SPRITE, LARGURA_SPRITE, ALTURA_SPRITE)).copy()
                         ]
                     }
-  
+
     
     def _setup_network(self):
         """Configura a conexão com o servidor"""
@@ -153,11 +142,63 @@ class Game:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-            
-            # Envia input para o servidor
+
             if event.type == pygame.KEYDOWN:
-                if event.key in self.key_actions:
-                    self.network_manager.send_input(self.key_actions[event.key])
+                if event.key == pygame.K_F11:
+                    self.toggle_fullscreen()
+
+        keys = pygame.key.get_pressed()
+        moving = False
+        
+        if keys[pygame.K_UP]:
+            self.network_manager.send_input(PlayerAction.UP)
+            moving = True
+
+        elif keys[pygame.K_DOWN]:
+            self.network_manager.send_input(PlayerAction.DOWN)
+            moving = True
+
+        elif keys[pygame.K_LEFT]:
+            self.network_manager.send_input(PlayerAction.LEFT)
+            moving = True
+            
+        elif keys[pygame.K_RIGHT]:
+            self.network_manager.send_input(PlayerAction.RIGHT)
+            moving = True
+            
+        if not moving:
+            self.network_manager.send_input(PlayerAction.STOP)
+
+
+    
+    def init_entity_animation_state(self):
+        """Inicializa estados de direção, frames, timers e posição anterior."""
+        
+        ENTITIES = (
+            EntityType.PACMAN,
+            EntityType.BLINKY,
+            EntityType.INKY,
+            EntityType.PINKY,
+            EntityType.CLYDE
+        )
+
+        now = pygame.time.get_ticks()
+
+        for entity in ENTITIES:
+            # tenta obter posição atual na grid
+            try:
+                pos = self.matrix.get_entity_position(entity)
+            except Exception:
+                pos = None
+
+            # salva posição anterior
+            self.prev_grid[entity] = (pos[0], pos[1]) if pos else None
+
+            # estado inicial de animação
+            self.entity_dirs[entity] = "right"
+            self.anim_frame[entity] = 0
+            self.anim_timer[entity] = now
+
     
     
     
@@ -240,7 +281,6 @@ class Game:
             entity_dirs=self.entity_dirs,
             anim_frames=self.anim_frame
         )
-
         pygame.display.update()
 
     
