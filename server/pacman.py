@@ -175,7 +175,7 @@ class PacmanIA:
     # -----------------------------------------------------------
     # UPDATE PRINCIPAL
     # -----------------------------------------------------------
-    def update(self, game_state: GameState):  # ← recebe game_state em vez de matriz
+    def update(self, game_state: GameState):  # Recebe game_state em vez de matriz
         matriz = game_state.matrix
         pos_pac = matriz.get_entity_position(EntityType.PACMAN)
         if not pos_pac:

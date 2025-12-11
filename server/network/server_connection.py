@@ -152,7 +152,6 @@ class ServerSocket:
         while self.pacman_running:
 
             with self.lock:
-                # print("DEBUG: __move_pacman tick")   # <--- debug
                 self.pacman_ai.update(self.game_state)
                 self.game_state.update()   # Atualiza o estado do jogo 
 
