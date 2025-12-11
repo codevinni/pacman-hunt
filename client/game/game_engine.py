@@ -2,9 +2,10 @@
 import pygame
 from common.matrix import Matrix
 from common.game_state import GameState
-from common.enums import PlayerAction
+from common.enums import PlayerAction, EntityType
 from client.game.config import *
 from ..network.network_manager import NetworkManager
+from client.utils.smooth_entity import SmoothEntity
 from client.utils.asset_loader import load_image, get_asset_path
 from client.game.renderer import GameRenderer
 
@@ -16,6 +17,14 @@ class Game:
         # Inicialização do PyGame
         pygame.init()
         self._setup_window()
+
+        self.visual_entities = {
+            EntityType.PACMAN: SmoothEntity(14, 23, self.tile_size), # Posição inicial Pacman
+            EntityType.BLINKY: SmoothEntity(12, 14, self.tile_size), # Posição inicial Blinky
+            EntityType.INKY: SmoothEntity(13, 14, self.tile_size),
+            EntityType.PINKY: SmoothEntity(14, 14, self.tile_size),
+            EntityType.CLYDE: SmoothEntity(15, 14, self.tile_size),
+        }
         
         # Carregamento de assets
         self._load_assets()
@@ -105,8 +114,18 @@ class Game:
     
     def _update_game_state(self):
         """Atualiza o estado do jogo a partir do servidor"""
-        self.game_state = self.network_manager.get_game_state()
-        self.matrix = self.game_state.matrix
+        new_state = self.network_manager.get_game_state()
+
+        if new_state:
+            self.game_state = new_state
+            self.matrix = self.game_state.matrix
+
+            # Sincronia dos alvos visuais com a matriz recebida
+            for entity_type, smooth_obj in self.visual_entities.items():
+                grid_pos = self.matrix.get_entity_position(entity_type)
+                if grid_pos:
+                    smooth_obj.update_target(grid_pos[0], grid_pos[1])
+        
     
     def _render(self):
         """Renderiza o jogo na tela"""
@@ -115,7 +134,8 @@ class Game:
             self.matrix, 
             self.tile_size, 
             self.blinky_img_rotated, 
-            self.pacman_image
+            self.pacman_image,
+            self.visual_entities
         )
         pygame.display.update()
     
@@ -127,6 +147,10 @@ class Game:
             self._handle_events()
             self._update_pacman_animation()
             self._update_game_state()
+
+            for entity in self.visual_entities.values():
+                entity.update()
+
             self._render()
         
         pygame.quit()

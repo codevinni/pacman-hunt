@@ -50,21 +50,24 @@ class GameRenderer:
                 tile_size // 4
             )
     
-    def draw_entity(self, matrix, entity_type, image, tile_size):
-        """Desenha uma entidade no mapa"""
-        entity_pos = matrix.get_entity_position(entity_type)
-        if entity_pos:
-            px, py = entity_pos[0] * tile_size, entity_pos[1] * tile_size
-            scaled_image = pygame.transform.scale(image, (tile_size, tile_size))
-            self.surface.blit(scaled_image, (px, py))
+    def draw_entity(self, x, y, image, tile_size):
+        """Desenha uma entidade na posição exata de pixel informada"""
+        scaled_image = pygame.transform.scale(image, (tile_size, tile_size))
+        self.surface.blit(scaled_image, (x, y))
     
-    def draw_matrix(self, matrix, tile_size, blinky_img, pacman_image):
+    def draw_matrix(self, matrix, tile_size, blinky_img, pacman_image, visual_entities):
         """Desenha o mapa completo com todas as entidades"""
-        # Desenha os tiles
+        # Desenha o labirinto estático (Tiles)
         for y, row in enumerate(matrix.matrix):
             for x, cell in enumerate(row):
                 self.draw_tile(cell, x, y, tile_size)
         
         # Desenha as entidades
-        self.draw_entity(matrix, EntityType.PACMAN, pacman_image, tile_size)
-        self.draw_entity(matrix, EntityType.BLINKY, blinky_img, tile_size)
+        if EntityType.PACMAN in visual_entities: # Pacman
+            px, py = visual_entities[EntityType.PACMAN].get_pos()
+            self.draw_entity(px, py, pacman_image, tile_size)
+        
+        # Posteriormente fazer loop para desenhar também os outros fantasmas
+        if EntityType.BLINKY in visual_entities: # Fantasmas
+            px, py = visual_entities[EntityType.BLINKY].get_pos()
+            self.draw_entity(px, py, blinky_img, tile_size)
