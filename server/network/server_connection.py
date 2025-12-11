@@ -152,7 +152,9 @@ class ServerSocket:
         while self.pacman_running:
 
             with self.lock:
-                self.pacman_ai.update(self.game_state.matrix)
+                # print("DEBUG: __move_pacman tick")   # <--- debug
+                self.pacman_ai.update(self.game_state)
+                self.game_state.update()   # Atualiza o estado do jogo 
 
             time.sleep(0.2)
 
@@ -286,7 +288,7 @@ class ServerSocket:
                 client_input_data: PlayerAction = self.receive_data(client_socket)
 
                 if assigned_ghost and client_input_data:
-                    print(f"Fantasma {assigned_ghost.name} mudou direção para: {client_input_data.name}")
+                    # print(f"Fantasma {assigned_ghost.name} mudou direção para: {client_input_data.name}")
                     # Atualiza a direção na thread de movimento
                     client_context['current_action'] = client_input_data
 

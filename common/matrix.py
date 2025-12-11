@@ -1,4 +1,4 @@
-from .enums import TileType, ItemType, EntityType, PlayerAction
+from .enums import TileType, ItemType, EntityType
 from .cell import Cell
 from .maze import maze_matrix
 
@@ -16,10 +16,13 @@ class Matrix:
     Atributes:
         matrix (list[list[Cell]]): Grid 28x31 contendo as células do labirinto.
         entities (dict[EntityType, tuple[int, int]]): Dicionário contendo as posições iniciais das entidades.
+        self.initial_positions: dict[EntityType, tuple[int, int]]: Posições iniciais das entidades para respawn. 
     '''
 
     def __init__(self):
         self.matrix = self.get_matrix()
+
+        # Posições atuais das entidades
         self.entities = {
             EntityType.PACMAN: (14,23),
             EntityType.BLINKY: (12,14),
@@ -27,6 +30,9 @@ class Matrix:
             EntityType.PINKY: (14,14),
             EntityType.CLYDE: (15,14)
         } 
+
+        # Posições iniciais das entidades
+        self.initial_positions = self.entities.copy()
 
     def get_matrix(self) -> list[list[Cell]]:
         '''
@@ -132,3 +138,16 @@ class Matrix:
         # Atualiza posição da entidade
         self.entities[entity] = (nx, ny)
         return collected  # Retorna item coletado ou None
+    
+    def has_remaining_pac_dots(self) -> bool:
+        '''
+        Verifica se ainda há PAC-DOTS restantes no mapa.
+
+        Returns:
+            bool: True se houver PAC-DOTS, False caso contrário.
+        '''
+        for row in self.matrix:
+            for cell in row:
+                if cell.has_pac_dot():
+                    return True
+        return False

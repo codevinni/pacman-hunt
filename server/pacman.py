@@ -1,5 +1,6 @@
 import heapq
-from common.enums import EntityType
+from common.enums import EntityType, ItemType
+from common.game_state import GameState
 
    # -----------------------------------------------------------
    # A SER IMPLEMENTADO:
@@ -174,7 +175,8 @@ class PacmanIA:
     # -----------------------------------------------------------
     # UPDATE PRINCIPAL
     # -----------------------------------------------------------
-    def update(self, matriz):
+    def update(self, game_state: GameState):  # ← recebe game_state em vez de matriz
+        matriz = game_state.matrix
         pos_pac = matriz.get_entity_position(EntityType.PACMAN)
         if not pos_pac:
             return
@@ -194,13 +196,19 @@ class PacmanIA:
                     if proximo != self.ultima_posicao:
                         nx, ny = proximo
                         self.ultima_posicao = pos_pac
-                        matriz.move_entity(EntityType.PACMAN, nx - pos_pac[0], ny - pos_pac[1])
+                        collected_item = matriz.move_entity(EntityType.PACMAN, nx - pos_pac[0], ny - pos_pac[1])
+                        if collected_item == ItemType.POWER_PELLET:
+                            game_state.activate_frightened_mode()
+                            print("Power Pellet coletado! Modo Frightened ativado!")
                         return
                     elif len(caminho) > 2:  # Tenta o próximo no caminho
                         proximo = caminho[2]
                         nx, ny = proximo
                         self.ultima_posicao = pos_pac
-                        matriz.move_entity(EntityType.PACMAN, nx - pos_pac[0], ny - pos_pac[1])
+                        collected_item = matriz.move_entity(EntityType.PACMAN, nx - pos_pac[0], ny - pos_pac[1])
+                        if collected_item == ItemType.POWER_PELLET:
+                            game_state.activate_frightened_mode()
+                            print("Power Pellet coletado! Modo Frightened ativado!")
                         return
 
         # 3) Está seguro → busca dots
@@ -214,7 +222,10 @@ class PacmanIA:
                 if proximo != self.ultima_posicao:
                     nx, ny = proximo
                     self.ultima_posicao = pos_pac
-                    matriz.move_entity(EntityType.PACMAN, nx - pos_pac[0], ny - pos_pac[1])
+                    collected_item = matriz.move_entity(EntityType.PACMAN, nx - pos_pac[0], ny - pos_pac[1])
+                    if collected_item == ItemType.POWER_PELLET:
+                        game_state.activate_frightened_mode()
+                        print("Power Pellet coletado! Modo Frightened ativado!")
                     return
 
         # 4) Último recurso: move para qualquer vizinho seguro
@@ -239,4 +250,7 @@ class PacmanIA:
             if melhor:
                 nx, ny = melhor
                 self.ultima_posicao = pos_pac
-                matriz.move_entity(EntityType.PACMAN, nx - pos_pac[0], ny - pos_pac[1])
+                collected_item = matriz.move_entity(EntityType.PACMAN, nx - pos_pac[0], ny - pos_pac[1])
+                if collected_item == ItemType.POWER_PELLET:
+                    game_state.activate_frightened_mode()
+                    print("Power Pellet coletado! Modo Frightened ativado!")
