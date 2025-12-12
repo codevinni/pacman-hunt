@@ -22,7 +22,7 @@ class GameState:
     """
 
     PACMAN_DEFAULT_LIVES = 3
-    FRIGHTENED_MODE_DURATION = 600  # 10 segundos (considerando 60 FPS)
+    FRIGHTENED_MODE_DURATION = 300  # 10 segundos (considerando 60 FPS)
     DEFAULT_POINTS_EARNED = 200
     DEFAULT_POINTS_LOST = -50
 

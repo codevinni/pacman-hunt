@@ -4,8 +4,6 @@ class GameMenu:
     def __init__(self, game):
         self.game = game
         self.active = False
-        self.font = pygame.font.SysFont("Arial", 28)
-
         self.options = [
             "Alternar modo de tela",
             "Sair do jogo"
