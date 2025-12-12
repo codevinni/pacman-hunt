@@ -522,7 +522,10 @@ class Game:
         while self.running:
             self.clock.tick(60)
             self._handle_events()
-            self._handle_special_keys()
+            self._handle_special_keys() 
+            if self.game_state.status in (GameStatus.PACMAN_VICTORY, GameStatus.GHOSTS_VICTORY):
+                self._render()
+                continue
             self._update_game_state()
             for entity in self.visual_entities.values():
                 entity.update()
