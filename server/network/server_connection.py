@@ -188,7 +188,7 @@ class ServerSocket:
 
             time.sleep(0.2)
 
-    def __game_state_sending(self, client_socket):
+    def __game_state_sending(self, client_socket, client_context):
         """
             Thread de envio contínuo do estado atual do jogo para o cliente.
 
@@ -201,14 +201,26 @@ class ServerSocket:
         """
         COOLDOWN = 0.05
 
-        while True:
+        isConected = True
+
+        while isConected:
+
             try:
                 self.send_game_state(client_socket)
                 time.sleep(COOLDOWN)
             except (ConnectionResetError, BrokenPipeError) as e:
                 # O cliente fechou a conexão de forma inesperada.
+                isConected = False
+                print(f"Cliente desconectado. Encerrando thread de envio")
+            except socket.error as e:
+                isConected = False
                 print(f"Erro de conexão inesperada durante o envio do estado do jogo ({e}). Encerrando thread de envio.")
-                break # Sai do loop, e a thread __game_state_sending termina
+            except Exception:
+                isConected = False
+                print(f"Erro interno na thread game_state_sending. Encerrando thread de envio.")
+
+            if not isConected:
+                client_context['running'] = False
 
     def __ghost_movement(self, assigned_ghost, client_context):
         """
@@ -307,11 +319,6 @@ class ServerSocket:
             print(f"Erro ao enviar atribuição para cliente: {e}")
             self.remove_client(client_socket)
             return
-        
-        # Thread que envia o estado do jogo constantemente
-        game_state_sender = threading.Thread(target=self.__game_state_sending, args=(client_socket,))
-        game_state_sender.daemon = True # Usado para desligamento rápido
-        game_state_sender.start()
 
         # Thread que inicia o PacMan
         if assigned_ghost and not self.pacman_running:
@@ -326,6 +333,11 @@ class ServerSocket:
             'next_action': None       # Próxima direção solicitada pelo cliente
         }
 
+        # Thread que envia o estado do jogo constantemente
+        game_state_sender = threading.Thread(target=self.__game_state_sending, args=(client_socket, client_context))
+        game_state_sender.daemon = True # Usado para desligamento rápido
+        game_state_sender.start()
+
         # Se o cliente controla um fantasma, inicia a thread de movimento dele
         if assigned_ghost:
             ghost_mover = threading.Thread(target=self.__ghost_movement, args=(assigned_ghost, client_context))
@@ -333,13 +345,13 @@ class ServerSocket:
             ghost_mover.start()
 
         # Loop de controle de movimento e envio de estado
-        while True:
+        while client_context['running']:
             try:
                 # Recebe a entrada do cliente (movimentação)
                 client_input_data: PlayerAction = self.receive_data(client_socket)
 
                 if assigned_ghost and client_input_data:
-                    print(f"Fantasma {assigned_ghost.name} solicitou direção: {client_input_data.name}")
+                    #print(f"Fantasma {assigned_ghost.name} solicitou direção: {client_input_data.name}")
                     # Armazena a nova direção solicitada, mas não a executa imediatamente 
                     client_context['next_action'] = client_input_data
 
@@ -347,13 +359,10 @@ class ServerSocket:
                 time.sleep(0.01)
 
             except (ConnectionResetError, BrokenPipeError): 
-                print("Cliente desconectado (Reset ou Broken Pipe)")
-                break
+                print("Cliente desconectado. Encerrando handle_client")
             except Exception as e:
-                print(f"Erro na comunicação com o cliente: {e}")
-                break
-        
-        client_context['running'] = False
+                print(f"Erro na comunicação com o cliente: {e},\n Encerrando handle_client")
+    
         self.remove_client(client_socket)
             
     def send_game_state(self, client_socket):
@@ -462,11 +471,12 @@ class ServerSocket:
 
                 if assigned_ghost is not None:
                     # Libera o fanstasma para outros jogadores
-                    self.available_ghosts.append(assigned_ghost)
+                    #self.available_ghosts.append(assigned_ghost)
+                    self.available_ghosts.insert(0, assigned_ghost)
                     # TODO: Implementar a lógica para remover a entidade da matriz ou movê-la
 
                 client_socket.close()
-                print("Cliente removido e fantasma liberado (se aplicável).")
+                print("Cliente removido e fantasma liberado.\n")
 
                 if len(self.available_ghosts) == 4:
                     self.pacman_running = False

@@ -1,6 +1,6 @@
 from .enums import TileType, ItemType, EntityType
 from .cell import Cell
-from .maze import maze_matrix
+from .maze import maze_matrix, W, E
 
 
 class Matrix:
@@ -167,3 +167,17 @@ class Matrix:
                 if cell.has_pac_dot():
                     return True
         return False
+    
+    def open_ghost_area(self):
+        """
+            Abre a área dos fantasmas redefinindo-o para uma célula (Cell) do tipo TileType.EMPTY (E)
+        """
+        self.matrix[12][13] = E()
+        self.matrix[12][14] = E()
+        
+    def close_ghost_area(self):
+        """
+            Fecha a área dos fantasmas redefinindo-o para uma célula (Cell) do tipo TileType.WALL (W)
+        """
+        self.matrix[12][13] = W
+        self.matrix[12][14] = W

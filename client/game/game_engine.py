@@ -502,7 +502,7 @@ class Game:
         self.screen.blit(overlay, (0, 0))
 
         lines = [
-            "CONFIGURAÇÕES",
+            "CONFIGURACOES",
             "Pressione P para continuar",
             f"Modo de Tela: {'Fullscreen' if self.fullscreen else 'Janela'}",
             "Pressione F11 para alternar modo de tela",

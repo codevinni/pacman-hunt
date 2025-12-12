@@ -22,7 +22,7 @@ class GameState:
     """
 
     PACMAN_DEFAULT_LIVES = 3
-    FRIGHTENED_MODE_DURATION = 300  # 10 segundos (considerando 60 FPS)
+    FRIGHTENED_MODE_DURATION = 200
     DEFAULT_POINTS_EARNED = 200
     DEFAULT_POINTS_LOST = -50
 
@@ -34,6 +34,7 @@ class GameState:
         self.matrix = Matrix()
         self.status = GameStatus.RUNNING  
         self.frightened_timer = 0
+        self.ghost_area_closed = False
         self.winner: str = None
         self.pacman_lives = self.PACMAN_DEFAULT_LIVES
 
@@ -50,6 +51,9 @@ class GameState:
             Método deve chamado quando o Pac-Man consome uma Power Pellet.
         """
         self.frightened_timer = self.FRIGHTENED_MODE_DURATION
+        self.matrix.close_ghost_area()
+        self.ghost_area_closed = True
+        
         print("Modo Frightened ativado")
 
     def is_frightened_mode(self) -> bool:
@@ -112,6 +116,9 @@ class GameState:
         if self.is_frightened_mode():
             self.__decrease_frightened_timer()
         
+            if self.frightened_timer == 1 and self.ghost_area_closed:
+                self.matrix.open_ghost_area()
+
         # Verifica colisões
         self.__check_collision()  
         
