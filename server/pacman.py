@@ -2,30 +2,95 @@ import heapq
 from common.enums import EntityType, ItemType
 from common.game_state import GameState
 
-   # -----------------------------------------------------------
-   # A SER IMPLEMENTADO:
-   # Lógica da powerball
-   # Lógica para tentar pegar os fantasmas após powerball. (?)
-   # Ordem das prioridades? Powerball > Fuga > Dot ou Fuga > Powerball > Dot?
-   # Colisão, etc
-   # -----------------------------------------------------------
-
-
 class PacmanIA:
+    # -----------------------------------------------------------
+    # 1. Modo Normal: Foge de fantasmas e busca dots
+    # 2. Frightened: Caça fantasmas ativamente
+    # 3. Heatmap p fugir de áreas perigosas
+    # 4. Fuga do loop de travamento
+    # -----------------------------------------------------------
 
-   # -----------------------------------------------------------
-   # PRIORIDADES
-   # 1) FUGIR de fantasmas próximos (usa A* para fugir)
-   # 2) COMER dots quando está seguro (usa A* para buscar)
-   # 3) Evita ficar preso em loops (memória de última posição, quando a distância do fantasma era a mesma em duas posições e não tinha
-   #    mais dots, o Pacman ficava piscando entre elas. Quando a lógica de encerrar o jogo for adicionada, não vamos precisar mais disso.)
-   # -----------------------------------------------------------
 
-    DIST_PERIGO = 3  # Distância considerada perigosa, coloquei 3 casas mas pode ser mudado.
+    DIST_PERIGO = 4  # Distância considerada perigosa
     FANTASMAS = [EntityType.BLINKY, EntityType.PINKY, EntityType.INKY, EntityType.CLYDE]
     
     def __init__(self):
-        self.ultima_posicao = None  # Para evitar loops
+        self.ultima_posicao = None
+        self.historico_posicoes = []  # Últimas N posições
+        self.MAX_HISTORICO = 5
+        self.contador_travamento = 0
+        self.heatmap = {}  # Mapa de calor de perigo
+        self.ultima_atualizacao_heatmap = 0
+        self.INTERVALO_HEATMAP = 3  # Atualiza heatmap a cada 3 updates
+
+    # -----------------------------------------------------------
+    # HEATMAP DE PERIGO
+    # -----------------------------------------------------------
+    def atualizar_heatmap(self, matriz):
+        """Gera mapa de calor baseado apenas nos fantasmas ATIVOS"""
+        self.heatmap.clear()
+        
+        for y in range(matriz.height()):
+            for x in range(matriz.width()):
+                cell = matriz.get_cell(x, y)
+                if not cell or not cell.is_walkable():
+                    continue
+                
+                perigo = 0
+                for fantasma in self.FANTASMAS:
+                    pos_f = matriz.get_entity_position(fantasma)
+                    pos_inicial = matriz.initial_positions.get(fantasma)
+                    
+                    # Só considera fantasmas que saíram da posição inicial (estão em jogo)
+                    if pos_f and pos_f != pos_inicial:
+                        dist = self.manhattan((x, y), pos_f)
+                        if dist <= self.DIST_PERIGO:
+                            # Perigo exponencial: quanto mais perto, muito mais perigoso
+                            perigo += (self.DIST_PERIGO - dist + 1) ** 2
+                
+                self.heatmap[(x, y)] = perigo
+        
+        self.ultima_atualizacao_heatmap = 0
+
+    def obter_perigo(self, pos):
+        """Retorna o nível de perigo de uma posição"""
+        return self.heatmap.get(pos, 0)
+
+    # -----------------------------------------------------------
+    # DETECÇÃO E RESOLUÇÃO DE TRAVAMENTO
+    # -----------------------------------------------------------
+    def detectar_travamento(self, pos_atual):
+        """Detecta se o Pac-Man está preso em loop"""
+        self.historico_posicoes.append(pos_atual)
+        
+        if len(self.historico_posicoes) > self.MAX_HISTORICO:
+            self.historico_posicoes.pop(0)
+        
+        if len(self.historico_posicoes) >= self.MAX_HISTORICO:
+            # Verifica se está oscilando entre 2-3 posições
+            posicoes_unicas = len(set(self.historico_posicoes))
+            if posicoes_unicas <= 2:
+                self.contador_travamento += 1
+                return self.contador_travamento > 3
+        
+        self.contador_travamento = 0
+        return False
+
+    def movimento_aleatorio_seguro(self, matriz, pos_pac):
+        """Escolhe um movimento aleatório para sair de travamento"""
+        vizinhos = self.vizinhos(matriz, pos_pac)
+        if not vizinhos:
+            return None
+        
+        # Filtra vizinhos que não estão no histórico recente
+        vizinhos_novos = [v for v in vizinhos if v not in self.historico_posicoes[-3:]]
+        
+        if vizinhos_novos:
+            # Escolhe o mais seguro dos novos
+            return min(vizinhos_novos, key=lambda v: self.obter_perigo(v))
+        
+        # Se todos estão no histórico, escolhe o menos perigoso
+        return min(vizinhos, key=lambda v: self.obter_perigo(v))
 
     # -----------------------------------------------------------
     # DISTÂNCIAS E AUXILIARES
@@ -45,10 +110,10 @@ class PacmanIA:
     def vizinhos(self, matriz, pos):
         x, y = pos
         candidatos = [
-            (x, y - 1),
-            (x, y + 1),
-            (x - 1, y),
-            (x + 1, y),
+            (x, y - 1),  # UP
+            (x, y + 1),  # DOWN
+            (x - 1, y),  # LEFT
+            (x + 1, y),  # RIGHT
         ]
 
         validos = []
@@ -60,27 +125,14 @@ class PacmanIA:
         return validos
 
     # -----------------------------------------------------------
-    # A* COM AVALIAÇÃO DE PERIGO
+    # A* COM HEATMAP
     # -----------------------------------------------------------
-    def calcular_perigo_posicao(self, matriz, pos):
-        # Calcula o perigo de uma posição baseado em todos os fantasmas 
-        perigo = 0
-        for fantasma in self.FANTASMAS:
-            pos_fantasma = matriz.get_entity_position(fantasma)
-            if not pos_fantasma:
-                continue
-            
-            dist = self.manhattan(pos, pos_fantasma)
-            if dist <= self.DIST_PERIGO:
-                perigo += (self.DIST_PERIGO - dist + 1) * 3
-        
-        return perigo
-
-    def astar(self, matriz, inicio, destino, fugindo=False):
-        
-        # A* que considera perigo dos fantasmas
-        # Se fugindo=True, prioriza caminhos mais seguros
-
+    def astar(self, matriz, inicio, destino, modo_caca=False):
+        """
+        A* que considera:
+        - Heatmap de perigo (modo normal)
+        - Prioriza proximidade no modo caça
+        """
         fila = []
         heapq.heappush(fila, (0, inicio))
 
@@ -94,13 +146,12 @@ class PacmanIA:
                 return self.reconstruir_caminho(veio_de, atual)
 
             for viz in self.vizinhos(matriz, atual):
-                # Custo base
                 custo = 1
                 
-                # Se estamos fugindo, adiciona peso alto em áreas perigosas
-                if fugindo:
-                    perigo = self.calcular_perigo_posicao(matriz, viz)
-                    custo += perigo * 2
+                # No modo caça, ignora perigo; no modo normal, adiciona peso
+                if not modo_caca:
+                    perigo = self.obter_perigo(viz)
+                    custo += perigo * 1.5
                 
                 novo_g = gscore[atual] + custo
 
@@ -113,58 +164,78 @@ class PacmanIA:
         return None
 
     # -----------------------------------------------------------
-    # OBJETIVOS
+    # OBJETIVOS - MODO NORMAL
     # -----------------------------------------------------------
-    def fantasma_mais_proximo(self, matriz, pos_pac):
-        # Retorna posição e distância do fantasma mais próximo 
-        mais_perto = None
-        melhor_dist = 999999
-
+    def fantasmas_proximos(self, matriz, pos_pac):
+        """Retorna lista de fantasmas ATIVOS próximos ordenados por distância"""
+        fantasmas = []
         for fantasma in self.FANTASMAS:
             pos = matriz.get_entity_position(fantasma)
-            if not pos:
-                continue
-
-            dist = self.manhattan(pos, pos_pac)
-            if dist < melhor_dist:
-                melhor_dist = dist
-                mais_perto = pos
-
-        return mais_perto, melhor_dist
+            # Verifica se o fantasma está em jogo (posição diferente da inicial)
+            pos_inicial = matriz.initial_positions.get(fantasma)
+            if pos and pos != pos_inicial:
+                dist = self.manhattan(pos, pos_pac)
+                fantasmas.append((fantasma, pos, dist))
+        
+        return sorted(fantasmas, key=lambda x: x[2])
 
     def ponto_fuga(self, matriz, pos_pac):
-        # -----------------------------------------------------------
-        # Encontra o ponto  mais longe de todos os fantasmas (que não seja muro)
-        # -----------------------------------------------------------
+        """Encontra ponto de fuga otimizado usando heatmap"""
         melhor_pos = None
-        melhor_dist = -1
+        menor_perigo = 999999
         
-        for y, linha in enumerate(matriz.matrix):
-            for x, cell in enumerate(linha):
-                if not cell.is_walkable():
+        # Busca em raio expandido ao redor do Pac-Man
+        raio = 6
+        x_pac, y_pac = pos_pac
+        
+        for dy in range(-raio, raio + 1):
+            for dx in range(-raio, raio + 1):
+                x, y = x_pac + dx, y_pac + dy
+                cell = matriz.get_cell(x, y)
+                
+                if not cell or not cell.is_walkable():
                     continue
                 
-                # Calcula distância total de todos os fantasmas
-                dist_total = 0
-                for fantasma in self.FANTASMAS:
-                    pos_f = matriz.get_entity_position(fantasma)
-                    if pos_f:
-                        dist_total += self.manhattan((x, y), pos_f)
+                perigo = self.obter_perigo((x, y))
+                dist_atual = self.manhattan((x, y), pos_pac)
                 
-                if dist_total > melhor_dist:
-                    melhor_dist = dist_total
+                # Prioriza locais com baixo perigo e não muito longe
+                score = perigo + (dist_atual * 0.5)
+                
+                if score < menor_perigo:
+                    menor_perigo = score
                     melhor_pos = (x, y)
         
         return melhor_pos
 
     def dot_mais_proximo(self, matriz, pos):
-        """Encontra o pac-dot mais próximo"""
+        """Encontra o pac-dot mais próximo considerando segurança"""
+        melhor = None
+        menor_score = 999999
+
+        for y, linha in enumerate(matriz.matrix):
+            for x, cell in enumerate(linha):
+                if cell.has_pac_dot():
+                    dist = self.manhattan((x, y), pos)
+                    perigo = self.obter_perigo((x, y))
+                    
+                    # Score balanceado: distância + perigo
+                    score = dist + (perigo * 0.3)
+                    
+                    if score < menor_score:
+                        menor_score = score
+                        melhor = (x, y)
+
+        return melhor
+
+    def power_pellet_mais_proximo(self, matriz, pos):
+        """Encontra a power pellet mais próxima"""
         melhor = None
         menor_dist = 999999
 
         for y, linha in enumerate(matriz.matrix):
             for x, cell in enumerate(linha):
-                if cell.has_pac_dot():
+                if cell.has_power_pellet():
                     dist = self.manhattan((x, y), pos)
                     if dist < menor_dist:
                         menor_dist = dist
@@ -173,82 +244,159 @@ class PacmanIA:
         return melhor
 
     # -----------------------------------------------------------
+    # OBJETIVOS - MODO CAÇA (FRIGHTENED)
+    # -----------------------------------------------------------
+    def fantasma_mais_proximo_caca(self, matriz, pos_pac):
+        """Encontra o fantasma ATIVO mais próximo para caçar (sem limite de distância)"""
+        melhor_fantasma = None
+        melhor_pos = None
+        menor_dist = 999999
+
+        for fantasma in self.FANTASMAS:
+            pos = matriz.get_entity_position(fantasma)
+            pos_inicial = matriz.initial_positions.get(fantasma)
+            
+            # Só considera fantasmas que saíram da posição inicial (estão em jogo)
+            if pos and pos != pos_inicial:
+                dist = self.manhattan(pos, pos_pac)
+                if dist < menor_dist:
+                    menor_dist = dist
+                    melhor_fantasma = fantasma
+                    melhor_pos = pos
+
+        return melhor_fantasma, melhor_pos, menor_dist
+
+    # -----------------------------------------------------------
+    # EXECUÇÃO DE MOVIMENTO
+    # -----------------------------------------------------------
+    def executar_movimento(self, matriz, game_state, pos_pac, destino, modo_caca=False):
+        """Executa movimento para o destino usando A*"""
+        if not destino:
+            return False
+        
+        caminho = self.astar(matriz, pos_pac, destino, modo_caca)
+        
+        if caminho and len(caminho) > 1:
+            proximo = caminho[1]
+            
+            # Evita voltar imediatamente
+            if proximo == self.ultima_posicao and len(caminho) > 2:
+                proximo = caminho[2]
+            
+            nx, ny = proximo
+            dx, dy = nx - pos_pac[0], ny - pos_pac[1]
+            
+            self.ultima_posicao = pos_pac
+            collected_item = matriz.move_entity(EntityType.PACMAN, dx, dy)
+            
+            # Ativa modo frightened se coletou power pellet
+            if collected_item == ItemType.POWER_PELLET:
+                game_state.activate_frightened_mode()
+            
+            return True
+        
+        return False
+
+    # -----------------------------------------------------------
     # UPDATE PRINCIPAL
     # -----------------------------------------------------------
-    def update(self, game_state: GameState):  # Recebe game_state em vez de matriz
+    def update(self, game_state: GameState):
         matriz = game_state.matrix
         pos_pac = matriz.get_entity_position(EntityType.PACMAN)
+        
         if not pos_pac:
             return
 
-        # 1) Verifica perigo
-        pos_fantasma, dist_fantasma = self.fantasma_mais_proximo(matriz, pos_pac)
+        # Atualiza heatmap periodicamente
+        self.ultima_atualizacao_heatmap += 1
+        if self.ultima_atualizacao_heatmap >= self.INTERVALO_HEATMAP:
+            self.atualizar_heatmap(matriz)
 
-        # 2) Se fantasma está MUITO perto → FOGE!
-        if dist_fantasma <= self.DIST_PERIGO:
-            destino = self.ponto_fuga(matriz, pos_pac)
+        # Verifica travamento
+        if self.detectar_travamento(pos_pac):
+            destino = self.movimento_aleatorio_seguro(matriz, pos_pac)
             if destino:
-                caminho = self.astar(matriz, pos_pac, destino, fugindo=True)
-                if caminho and len(caminho) > 1:
-                    proximo = caminho[1]
-                    
-                    # Evita voltar para onde estava (anti-loop)
-                    if proximo != self.ultima_posicao:
-                        nx, ny = proximo
-                        self.ultima_posicao = pos_pac
-                        collected_item = matriz.move_entity(EntityType.PACMAN, nx - pos_pac[0], ny - pos_pac[1])
-                        if collected_item == ItemType.POWER_PELLET:
-                            game_state.activate_frightened_mode()
-                        return
-                    
-                    elif len(caminho) > 2:  # Tenta o próximo no caminho
-                        proximo = caminho[2]
-                        nx, ny = proximo
-                        self.ultima_posicao = pos_pac
-                        collected_item = matriz.move_entity(EntityType.PACMAN, nx - pos_pac[0], ny - pos_pac[1])
-                        if collected_item == ItemType.POWER_PELLET:
-                            game_state.activate_frightened_mode()
-                        return
-
-        # 3) Está seguro → busca dots
-        destino = self.dot_mais_proximo(matriz, pos_pac)
-        if destino:
-            caminho = self.astar(matriz, pos_pac, destino, fugindo=False)
-            if caminho and len(caminho) > 1:
-                proximo = caminho[1]
-                
-                # Evita voltar (anti-loop)
-                if proximo != self.ultima_posicao:
-                    nx, ny = proximo
-                    self.ultima_posicao = pos_pac
-                    collected_item = matriz.move_entity(EntityType.PACMAN, nx - pos_pac[0], ny - pos_pac[1])
-                    if collected_item == ItemType.POWER_PELLET:
-                        game_state.activate_frightened_mode()
-                    return
-
-        # 4) Último recurso: move para qualquer vizinho seguro
-        vizinhos = self.vizinhos(matriz, pos_pac)
-        if vizinhos:
-            # Escolhe o vizinho com menor perigo que não seja a última posição
-            melhor = None
-            menor_perigo = 999999
-            
-            for v in vizinhos:
-                if v == self.ultima_posicao:
-                    continue
-                perigo = self.calcular_perigo_posicao(matriz, v)
-                if perigo < menor_perigo:
-                    menor_perigo = perigo
-                    melhor = v
-            
-            # Se todos os vizinhos são a última posição, aceita voltar
-            if not melhor and vizinhos:
-                melhor = vizinhos[0]
-            
-            if melhor:
-                nx, ny = melhor
+                nx, ny = destino
+                dx, dy = nx - pos_pac[0], ny - pos_pac[1]
                 self.ultima_posicao = pos_pac
-                collected_item = matriz.move_entity(EntityType.PACMAN, nx - pos_pac[0], ny - pos_pac[1])
+                collected_item = matriz.move_entity(EntityType.PACMAN, dx, dy)
                 if collected_item == ItemType.POWER_PELLET:
                     game_state.activate_frightened_mode()
-                return  
+                self.historico_posicoes.clear()
+            return
+
+        # -----------------------------------------------------------
+        # MODO FRIGHTENED: CAÇA FANTASMAS
+        # -----------------------------------------------------------
+        if game_state.is_frightened_mode():
+            fantasma, pos_fantasma, dist = self.fantasma_mais_proximo_caca(matriz, pos_pac)
+            
+            if fantasma and pos_fantasma:
+                # SEMPRE caça o fantasma mais próximo, não importa a distância
+                if self.executar_movimento(matriz, game_state, pos_pac, pos_fantasma, modo_caca=True):
+                    return
+            
+            # Fallback apenas se não conseguir calcular caminho para o fantasma
+            # (possivelmente nunca vai acontecer, mas só para ter certeza)
+            destino = self.dot_mais_proximo(matriz, pos_pac)
+            if self.executar_movimento(matriz, game_state, pos_pac, destino, modo_caca=True):
+                return
+
+        # -----------------------------------------------------------
+        # MODO NORMAL
+        # -----------------------------------------------------------
+        else:
+            fantasmas_prox = self.fantasmas_proximos(matriz, pos_pac)
+            
+            # 1) PERIGO IMINENTE: FOGE
+            if fantasmas_prox and fantasmas_prox[0][2] <= self.DIST_PERIGO:
+                # Verifica se há power pellet próxima e alcançável
+                power_pellet = self.power_pellet_mais_proximo(matriz, pos_pac)
+                
+                if power_pellet:
+                    dist_pellet = self.manhattan(power_pellet, pos_pac)
+                    dist_fantasma = fantasmas_prox[0][2]
+                    
+                    # Se power pellet está mais perto que o fantasma, vai pegá-la
+                    if dist_pellet < dist_fantasma - 1:
+                        if self.executar_movimento(matriz, game_state, pos_pac, power_pellet):
+                            return
+                
+                # Caso contrário, foge
+                destino = self.ponto_fuga(matriz, pos_pac)
+                if self.executar_movimento(matriz, game_state, pos_pac, destino):
+                    return
+            
+            # 2) PERIGO MODERADO: PRIORIZA POWER PELLET
+            elif fantasmas_prox and fantasmas_prox[0][2] <= self.DIST_PERIGO + 2:
+                power_pellet = self.power_pellet_mais_proximo(matriz, pos_pac)
+                
+                if power_pellet:
+                    if self.executar_movimento(matriz, game_state, pos_pac, power_pellet):
+                        return
+                
+                # Se não há power pellet, busca dots seguros
+                destino = self.dot_mais_proximo(matriz, pos_pac)
+                if self.executar_movimento(matriz, game_state, pos_pac, destino):
+                    return
+            
+            # 3) SEGURO: BUSCA DOTS
+            else:
+                destino = self.dot_mais_proximo(matriz, pos_pac)
+                if self.executar_movimento(matriz, game_state, pos_pac, destino):
+                    return
+
+        # 4) ÚLTIMO RECURSO: MOVIMENTO SEGURO QUALQUER
+        vizinhos = self.vizinhos(matriz, pos_pac)
+        if vizinhos:
+            melhor = min(vizinhos, key=lambda v: (
+                self.obter_perigo(v),
+                v == self.ultima_posicao  # Penaliza voltar
+            ))
+            
+            nx, ny = melhor
+            dx, dy = nx - pos_pac[0], ny - pos_pac[1]
+            self.ultima_posicao = pos_pac
+            collected_item = matriz.move_entity(EntityType.PACMAN, dx, dy)
+            if collected_item == ItemType.POWER_PELLET:
+                game_state.activate_frightened_mode()
