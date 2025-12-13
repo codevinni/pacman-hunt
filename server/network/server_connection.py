@@ -99,9 +99,13 @@ class ServerSocket:
         # Loop principal de atualização do jogo
         while self.game_running:
             with self.lock:
+
                 # Executa uma atualização completa do estado do jogo
                 self.game_state.update()
-                
+
+                if self.game_state.restart_game_timer == 0:
+                    self.game_state.reset()
+               
             time.sleep(UPDATE_INTERVAL)
 
     def __shutdown(self):
@@ -185,8 +189,9 @@ class ServerSocket:
 
             with self.lock:
                 self.pacman_ai.update(self.game_state)
-
-            time.sleep(0.2)
+            
+            modifier = 0.012 * (4 - len(self.available_ghosts)) # 0.012 mais rapido para cada fantasma no jogo 
+            time.sleep(0.23 - modifier)
 
     def __game_state_sending(self, client_socket, client_context):
         """

@@ -23,6 +23,7 @@ class GameState:
 
     PACMAN_DEFAULT_LIVES = 3
     FRIGHTENED_MODE_DURATION = 200
+    RESTARTING_GAME_TIME = 300
     DEFAULT_POINTS_EARNED = 200
     DEFAULT_POINTS_LOST = -50
 
@@ -30,20 +31,33 @@ class GameState:
         """ 
             Inicializa um novo estado de jogo.
         """
+        self.__set_default_values()
+    
+    def __set_default_values(self):
+        """ Inicializa todos os atributos do objeto com os valores padrão.
+        """ 
 
         self.matrix = Matrix()
         self.status = GameStatus.RUNNING  
+
         self.frightened_timer = 0
         self.ghost_area_closed = False
+
+        self.restart_game_timer = self.RESTARTING_GAME_TIME
+        self.restarted = False
+
         self.winner: str = None
         self.pacman_lives = self.PACMAN_DEFAULT_LIVES
-
+        
         self.scores = {
             EntityType.BLINKY: 0,
             EntityType.INKY: 0,
             EntityType.PINKY: 0,
             EntityType.CLYDE: 0
         }
+
+    def reset(self):
+        self.__set_default_values()
 
     def activate_frightened_mode(self) -> None:
         """ 
@@ -104,12 +118,21 @@ class GameState:
         
         return False
  
+    def __decrease_restart_timer(self) -> None:
+        """ 
+            Inicia a contagem para o reinicio do jogo
+        """
+        if self.restart_game_timer > 0:
+            self.restart_game_timer -= 1
+
     def update(self) -> None:
         """ 
             Atualiza lógicas temporais do estado.
             Método chamado a cada tick do loop do servidor.
         """
+        
         if self.status != GameStatus.RUNNING:
+            self.__decrease_restart_timer()
             return
         
         # Atualiza tempo do frightened

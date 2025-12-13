@@ -297,21 +297,24 @@ class Game:
         self.game_state = new_state
         self.matrix = new_state.matrix
 
+        game_reseted = self.game_state.pacman_lives > self.pacman_lives # Para indicar se o jogo foi resetado ou não (gambiarra temporaria)
+        
         # detecta mudanças de pontuação e cria notificação
         for ghost, score in self.game_state.scores.items():
             old = self.previous_scores.get(ghost, 0)
-            if score != old:
+            if score != old and not game_reseted:
                 diff = score - old
                 if diff > 0:
-                    self._push_notification(f"O fantasma {ghost.name.title()} pontou e está com {score} pontos")
+                    self._push_notification(f"O fantasma {ghost.name.title()} eliminou o pacman")
                 else:
-                    self._push_notification(f"Pontuação de {ghost.name.title()} alterada: {score}")
+                    self._push_notification(f"{ghost.name.title()} foi eliminado")
+                
         self.previous_scores = dict(self.game_state.scores)
-
+        
         # detecta mudança de vidas do pacman
         if self.game_state.pacman_lives != self.pacman_lives:
             if self.game_state.pacman_lives < self.pacman_lives:
-                self._push_notification(f"Pac-Man perdeu uma vida. Vidas restantes: {self.game_state.pacman_lives}")
+                self._push_notification(f"Pac-Man eliminado - Vidas restantes: {self.game_state.pacman_lives}")
             self.pacman_lives = self.game_state.pacman_lives
 
         # sincroniza targets e calcula direções por delta entre grids
@@ -360,7 +363,7 @@ class Game:
         padding_y = 6
         for msg, end in self.notifications:
             if end >= now:
-                surf = self.font.render(msg, True, (255, 230, 0))
+                surf = self.font.render(msg, True, (255, 255, 255))
                 rect_w = surf.get_width() + padding_x * 2
                 rect_h = surf.get_height() + padding_y * 2
                 rect_x = center_x - rect_w // 2
@@ -441,6 +444,7 @@ class Game:
         overlay = pygame.Surface((w, h), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 200))
         self.screen.blit(overlay, (0, 0))
+        last_y = 1
 
         if self.game_state.status == GameStatus.PACMAN_VICTORY:
             pac = pygame.transform.scale(self.pacman_sprites["right"][0], (128, 128))
@@ -451,6 +455,9 @@ class Game:
             tx = (w - text.get_width()) // 2
             ty = y + pac.get_height() + 20
             self.screen.blit(text, (tx, ty))
+
+            last_y = ty + text.get_height()
+
         elif self.game_state.status == GameStatus.GHOSTS_VICTORY:
             winner = self.game_state.winner
             if isinstance(winner, EntityType):
@@ -460,6 +467,18 @@ class Game:
             tx = (w - text.get_width()) // 2
             ty = h // 2 - text.get_height() // 2
             self.screen.blit(text, (tx, ty))
+
+            last_y = ty + text.get_height() # Obter posicionamento y final do texto de vitório
+
+        restart_timer = self.game_state.restart_game_timer
+        if restart_timer < self.game_state.RESTARTING_GAME_TIME:
+
+            restart_msg  = self.font.render("Reiniciando jogo...", True, (255, 255, 255))
+
+            pos_x = (w - restart_msg.get_width()) // 2
+            pos_y = last_y + 40
+
+            self.screen.blit(restart_msg, (pos_x, pos_y))
 
     def _render(self) -> None:
         """
@@ -520,15 +539,16 @@ class Game:
         Loop principal do cliente.
         """
         while self.running:
+
             self.clock.tick(60)
             self._handle_events()
             self._handle_special_keys() 
-            if self.game_state.status in (GameStatus.PACMAN_VICTORY, GameStatus.GHOSTS_VICTORY):
-                self._render()
-                continue
             self._update_game_state()
+
             for entity in self.visual_entities.values():
                 entity.update()
+
             self._update_animations()
             self._render()
+            
         pygame.quit()

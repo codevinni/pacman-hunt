@@ -1,3 +1,4 @@
+import copy
 from .enums import TileType, ItemType, EntityType
 from .cell import Cell
 from .maze import maze_matrix, W, E
@@ -41,7 +42,7 @@ class Matrix:
             Returns:
                 list[list[Cell]]: Grade contendo todas as células do labirinto.
         """
-        return maze_matrix
+        return copy.deepcopy(maze_matrix)
 
     def width(self) -> int:
         """
