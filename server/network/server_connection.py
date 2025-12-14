@@ -484,4 +484,5 @@ class ServerSocket:
                 print("Cliente removido e fantasma liberado.\n")
 
                 if len(self.available_ghosts) == 4:
+                    self.game_state.reset()
                     self.pacman_running = False
