@@ -1,13 +1,15 @@
 # client/game/game_engine.py
 
 from __future__ import annotations
+import os
 import pygame
 import time
 from typing import Dict, Optional, Tuple, List
-
+from os import *
 from common.game_state import GameState
 from common.enums import PlayerAction, EntityType, GameStatus
 from client.game.config import *
+from client.game.sound_manager import *
 from client.utils.smooth_entity import SmoothEntity
 from client.utils.asset_loader import load_image, get_asset_path
 from client.game.renderer import GameRenderer
@@ -69,6 +71,17 @@ class Game:
 
         # renderer
         self.renderer = GameRenderer(self.screen)
+
+        # Inicializa o gerenciador de som
+        sounds_path = os.path.join(os.path.dirname(get_asset_path("sprites.png")), "..", "sounds")
+        sounds_path = os.path.normpath(sounds_path)
+        
+        try:
+            from client.game.sound_manager import SoundManager
+            self.sound_manager = SoundManager(sounds_path, volume=0.7)
+        except Exception as e:
+            self.sound_manager = None
+        # ========================
 
         # mapeamento de teclas -> PlayerAction
         self.key_actions = {
@@ -297,17 +310,21 @@ class Game:
         self.game_state = new_state
         self.matrix = new_state.matrix
 
-        game_reseted = self.game_state.pacman_lives > self.pacman_lives # Para indicar se o jogo foi resetado ou não (gambiarra temporaria)
+        game_reseted = self.game_state.pacman_lives > self.pacman_lives
         
         # detecta mudanças de pontuação e cria notificação
         for ghost, score in self.game_state.scores.items():
             old = self.previous_scores.get(ghost, 0)
             if score != old and not game_reseted:
                 diff = score - old
-                if diff > 0:
-                    self._push_notification(f"O fantasma {ghost.name.title()} eliminou o pacman")
+                if self.sound_manager:
+                    self.sound_manager.play_death()
+                    # ==================================
                 else:
-                    self._push_notification(f"{ghost.name.title()} foi eliminado")
+                    # ===== SOM DE COMER FANTASMA =====
+                    if self.sound_manager:
+                        self.sound_manager.play_eat_ghost()
+                    # =================================
                 
         self.previous_scores = dict(self.game_state.scores)
         
@@ -315,6 +332,10 @@ class Game:
         if self.game_state.pacman_lives != self.pacman_lives:
             if self.game_state.pacman_lives < self.pacman_lives:
                 self._push_notification(f"Pac-Man eliminado - Vidas restantes: {self.game_state.pacman_lives}")
+                # ===== SOM DE MORTE =====
+                if self.sound_manager:
+                    self.sound_manager.play_death()
+                # ========================
             self.pacman_lives = self.game_state.pacman_lives
 
         # sincroniza targets e calcula direções por delta entre grids
@@ -534,6 +555,36 @@ class Game:
             self.screen.blit(text, (x, y))
             y += 40
 
+    def _update_sounds(self) -> None:
+        if not self.sound_manager:
+            return
+            
+        if not hasattr(self, '_game_started_sound_played'):
+            self._game_started_sound_played = False
+            
+            # Toca som de início apenas uma vez
+        if self.game_state.status == GameStatus.RUNNING and not self._game_started_sound_played:
+            self.sound_manager.play_start()
+            self._game_started_sound_played = True
+            
+            # Modo Frightened
+        if self.game_state.is_frightened_mode():
+            if not hasattr(self, '_frightened_active') or not self._frightened_active:
+                self.sound_manager.play_eat_power_pellet()
+                self._frightened_active = True
+            else:
+                if hasattr(self, '_frightened_active') and self._frightened_active:
+                    self.sound_manager.stop_fright_mode()
+                    self._frightened_active = False
+            
+            # Toca sirene se o jogo está rodando e não está em frightened
+        if self.game_state.status == GameStatus.RUNNING and not self.game_state.is_frightened_mode():
+                # Calcula o nível da sirene baseado em dots restantes (opcional)
+                # Por enquanto usa nível 0
+            self.sound_manager.play_siren(level=0)
+
+
+
     def run(self) -> None:
         """
         Loop principal do cliente.
@@ -550,5 +601,8 @@ class Game:
 
             self._update_animations()
             self._render()
-            
+            self._update_sounds() 
+
+        if self.sound_manager:
+            self.sound_manager.cleanup()    
         pygame.quit()
