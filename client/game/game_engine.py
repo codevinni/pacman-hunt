@@ -9,7 +9,7 @@ from os import *
 from common.game_state import GameState
 from common.enums import PlayerAction, EntityType, GameStatus
 from client.game.config import *
-from client.game.sound_manager import *
+from client.utils.sound_manager import *
 from client.utils.smooth_entity import SmoothEntity
 from client.utils.asset_loader import load_image, get_asset_path
 from client.game.renderer import GameRenderer
@@ -77,7 +77,7 @@ class Game:
         sounds_path = os.path.normpath(sounds_path)
         
         try:
-            from client.game.sound_manager import SoundManager
+            from client.utils.sound_manager import SoundManager
             self.sound_manager = SoundManager(sounds_path, volume=0.7)
         except Exception as e:
             self.sound_manager = None
