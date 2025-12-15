@@ -72,16 +72,14 @@ class Game:
         # renderer
         self.renderer = GameRenderer(self.screen)
 
-        # Inicializa o gerenciador de som
+        #inicializa o gerenciador de som com volume e path para os assets definidos
         sounds_path = os.path.join(os.path.dirname(get_asset_path("sprites.png")), "..", "sounds")
         sounds_path = os.path.normpath(sounds_path)
-        
         try:
             from client.utils.sound_manager import SoundManager
             self.sound_manager = SoundManager(sounds_path, volume=0.7)
         except Exception as e:
             self.sound_manager = None
-        # ========================
 
         # mapeamento de teclas -> PlayerAction
         self.key_actions = {
@@ -319,12 +317,9 @@ class Game:
                 diff = score - old
                 if self.sound_manager:
                     self.sound_manager.play_death()
-                    # ==================================
                 else:
-                    # ===== SOM DE COMER FANTASMA =====
                     if self.sound_manager:
                         self.sound_manager.play_eat_ghost()
-                    # =================================
                 
         self.previous_scores = dict(self.game_state.scores)
         
@@ -579,8 +574,6 @@ class Game:
             
             # Toca sirene se o jogo está rodando e não está em frightened
         if self.game_state.status == GameStatus.RUNNING and not self.game_state.is_frightened_mode():
-                # Calcula o nível da sirene baseado em dots restantes (opcional)
-                # Por enquanto usa nível 0
             self.sound_manager.play_siren(level=0)
 
 
