@@ -1,6 +1,7 @@
 # client/game/game_engine.py
 
 from __future__ import annotations
+import os
 import pygame
 import time
 from typing import Dict, Optional, Tuple, List
@@ -8,7 +9,7 @@ from os import *
 from common.game_state import GameState
 from common.enums import PlayerAction, EntityType, GameStatus
 from client.game.config import *
-from client.utils.sound_manager import *
+from client.game.sound_manager import *
 from client.utils.smooth_entity import SmoothEntity
 from client.utils.asset_loader import load_image, get_asset_path
 from client.game.renderer import GameRenderer
@@ -78,9 +79,7 @@ class Game:
         try:
             from client.game.sound_manager import SoundManager
             self.sound_manager = SoundManager(sounds_path, volume=0.7)
-            print(f"Sistema de som inicializado com sucesso!")
         except Exception as e:
-            print(f"Erro ao inicializar som: {e}")
             self.sound_manager = None
         # ========================
 
@@ -294,81 +293,77 @@ class Game:
                 self.anim_frame[et] ^= 1
                 self.anim_timer[et] = now
 
-def _update_game_state(self) -> None:
-    """
-    Recebe o GameState do servidor, atualiza a matriz local,
-    sincroniza SmoothEntity targets e detecta mudanças de score/vidas
-    para notificar o jogador.
-    """
-    try:
-        new_state = self.network_manager.get_game_state()
-    except Exception:
-        new_state = None
+    def _update_game_state(self) -> None:
+        """
+        Recebe o GameState do servidor, atualiza a matriz local,
+        sincroniza SmoothEntity targets e detecta mudanças de score/vidas
+        para notificar o jogador.
+        """
+        try:
+            new_state = self.network_manager.get_game_state()
+        except Exception:
+            new_state = None
 
-    if not new_state:
-        return
+        if not new_state:
+            return
 
-    self.game_state = new_state
-    self.matrix = new_state.matrix
+        self.game_state = new_state
+        self.matrix = new_state.matrix
 
-    game_reseted = self.game_state.pacman_lives > self.pacman_lives
-    
-    # detecta mudanças de pontuação e cria notificação
-    for ghost, score in self.game_state.scores.items():
-        old = self.previous_scores.get(ghost, 0)
-        if score != old and not game_reseted:
-            diff = score - old
-            if diff > 0:
-                self._push_notification(f"O fantasma {ghost.name.title()} eliminou o pacman")
-                # ===== SOM DE MORTE DO PACMAN =====
+        game_reseted = self.game_state.pacman_lives > self.pacman_lives
+        
+        # detecta mudanças de pontuação e cria notificação
+        for ghost, score in self.game_state.scores.items():
+            old = self.previous_scores.get(ghost, 0)
+            if score != old and not game_reseted:
+                diff = score - old
                 if self.sound_manager:
                     self.sound_manager.play_death()
-                # ==================================
-            else:
-                self._push_notification(f"{ghost.name.title()} foi eliminado")
-                # ===== SOM DE COMER FANTASMA =====
-                if self.sound_manager:
-                    self.sound_manager.play_eat_ghost()
-                # =================================
-            
-    self.previous_scores = dict(self.game_state.scores)
-    
-    # detecta mudança de vidas do pacman
-    if self.game_state.pacman_lives != self.pacman_lives:
-        if self.game_state.pacman_lives < self.pacman_lives:
-            self._push_notification(f"Pac-Man eliminado - Vidas restantes: {self.game_state.pacman_lives}")
-            # ===== SOM DE MORTE =====
-            if self.sound_manager:
-                self.sound_manager.play_death()
-            # ========================
-        self.pacman_lives = self.game_state.pacman_lives
-
-    # sincroniza targets e calcula direções por delta entre grids
-    for ent_type, smooth in list(self.visual_entities.items()):
-        try:
-            grid_pos = self.matrix.get_entity_position(ent_type)
-        except Exception:
-            grid_pos = None
-
-        if grid_pos:
-            gx, gy = grid_pos[0], grid_pos[1]
-            prev = self.prev_grid.get(ent_type)
-            if prev is not None:
-                ox, oy = prev
-                dx = gx - ox
-                dy = gy - oy
-                if dx == 0 and dy == 0:
-                    pass
+                    # ==================================
                 else:
-                    if abs(dx) >= abs(dy):
-                        self.entity_dirs[ent_type] = "right" if dx > 0 else "left"
-                    else:
-                        self.entity_dirs[ent_type] = "down" if dy > 0 else "up"
-            self.prev_grid[ent_type] = (gx, gy)
+                    # ===== SOM DE COMER FANTASMA =====
+                    if self.sound_manager:
+                        self.sound_manager.play_eat_ghost()
+                    # =================================
+                
+        self.previous_scores = dict(self.game_state.scores)
+        
+        # detecta mudança de vidas do pacman
+        if self.game_state.pacman_lives != self.pacman_lives:
+            if self.game_state.pacman_lives < self.pacman_lives:
+                self._push_notification(f"Pac-Man eliminado - Vidas restantes: {self.game_state.pacman_lives}")
+                # ===== SOM DE MORTE =====
+                if self.sound_manager:
+                    self.sound_manager.play_death()
+                # ========================
+            self.pacman_lives = self.game_state.pacman_lives
+
+        # sincroniza targets e calcula direções por delta entre grids
+        for ent_type, smooth in list(self.visual_entities.items()):
             try:
-                smooth.update_target(gx, gy)
+                grid_pos = self.matrix.get_entity_position(ent_type)
             except Exception:
-                self.visual_entities[ent_type] = SmoothEntity(gx, gy, self.tile_size)
+                grid_pos = None
+
+            if grid_pos:
+                gx, gy = grid_pos[0], grid_pos[1]
+                prev = self.prev_grid.get(ent_type)
+                if prev is not None:
+                    ox, oy = prev
+                    dx = gx - ox
+                    dy = gy - oy
+                    if dx == 0 and dy == 0:
+                        pass
+                    else:
+                        if abs(dx) >= abs(dy):
+                            self.entity_dirs[ent_type] = "right" if dx > 0 else "left"
+                        else:
+                            self.entity_dirs[ent_type] = "down" if dy > 0 else "up"
+                self.prev_grid[ent_type] = (gx, gy)
+                try:
+                    smooth.update_target(gx, gy)
+                except Exception:
+                    self.visual_entities[ent_type] = SmoothEntity(gx, gy, self.tile_size)
 
     def _push_notification(self, text: str, duration_ms: int = NOTIFICATION_DURATION_MS) -> None:
         """
@@ -560,34 +555,34 @@ def _update_game_state(self) -> None:
             self.screen.blit(text, (x, y))
             y += 40
 
-        def _update_sounds(self) -> None:
-            if not self.sound_manager:
-                return
+    def _update_sounds(self) -> None:
+        if not self.sound_manager:
+            return
             
-            # Se o jogo acabou de começar (primeira vez que game_state tem status RUNNING)
-            if not hasattr(self, '_game_started_sound_played'):
-                self._game_started_sound_played = False
+        if not hasattr(self, '_game_started_sound_played'):
+            self._game_started_sound_played = False
             
             # Toca som de início apenas uma vez
-            if self.game_state.status == GameStatus.RUNNING and not self._game_started_sound_played:
-                self.sound_manager.play_start()
-                self._game_started_sound_played = True
+        if self.game_state.status == GameStatus.RUNNING and not self._game_started_sound_played:
+            self.sound_manager.play_start()
+            self._game_started_sound_played = True
             
             # Modo Frightened
-            if self.game_state.is_frightened_mode():
-                if not hasattr(self, '_frightened_active') or not self._frightened_active:
-                    self.sound_manager.play_eat_power_pellet()
-                    self._frightened_active = True
+        if self.game_state.is_frightened_mode():
+            if not hasattr(self, '_frightened_active') or not self._frightened_active:
+                self.sound_manager.play_eat_power_pellet()
+                self._frightened_active = True
             else:
                 if hasattr(self, '_frightened_active') and self._frightened_active:
                     self.sound_manager.stop_fright_mode()
                     self._frightened_active = False
             
             # Toca sirene se o jogo está rodando e não está em frightened
-            if self.game_state.status == GameStatus.RUNNING and not self.game_state.is_frightened_mode():
+        if self.game_state.status == GameStatus.RUNNING and not self.game_state.is_frightened_mode():
                 # Calcula o nível da sirene baseado em dots restantes (opcional)
                 # Por enquanto usa nível 0
-                self.sound_manager.play_siren(level=0)
+            self.sound_manager.play_siren(level=0)
+
 
 
     def run(self) -> None:
@@ -605,9 +600,9 @@ def _update_game_state(self) -> None:
                 entity.update()
 
             self._update_animations()
+            self._render()
             self._update_sounds() 
 
-            self._render()
-            if self.sound_manager:
-                self.sound_manager.cleanup()
+        if self.sound_manager:
+            self.sound_manager.cleanup()    
         pygame.quit()
