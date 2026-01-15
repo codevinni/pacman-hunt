@@ -2,6 +2,8 @@
 
 **Pac-Man Hunt** é uma reinterpretação multiplayer competitiva do clássico Pac-Man, sendo totalmente desenvolvido em Python. O jogo permite que múltiplos jogadores se conectem simultaneamente assumindo o papel de um dos **Fantasmas** (Blinky, Pinky, Inky e Clyde) em uma caçada ao Pac-Man, que é controlado pelo servidor.
 
+<img width="1919" height="933" alt="Captura de tela 2026-01-09 000403" src="https://github.com/user-attachments/assets/80362999-2dca-4023-b53f-18f95e66167b" />
+
 ---
 
 ## 🛠️ Tecnologias Utilizadas
